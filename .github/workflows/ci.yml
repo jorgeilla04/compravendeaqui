@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    name: Backend (test + lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: black --check
+        run: black --check app
+
+      - name: isort --check
+        run: isort --check-only app
+
+      - name: flake8
+        run: flake8 app
+
+      - name: mypy
+        run: mypy app
+
+      - name: pytest
+        run: pytest --cov=app --cov-report=term-missing
+
+  frontend:
+    name: Frontend (build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  design-audit:
+    name: Design audit (Impeccable)
+    runs-on: ubuntu-latest
+    needs: frontend
+    # TODO(Fase 0): quitar continue-on-error cuando Impeccable esté instalado
+    # en el repo frontend (`npx impeccable install`). Por ahora no bloquea el
+    # pipeline: el design system vive en Docs/DESIGN.md y Docs/PRODUCT.md.
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Impeccable audit
+        run: npx --yes impeccable audit || echo "Impeccable no instalado todavía — ver TODO."

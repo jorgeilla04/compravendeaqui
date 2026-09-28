@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Tokens de DESIGN.md — fuente de verdad visual.
+ * Light por defecto; dark obligatorio por prefers-color-scheme y [data-theme].
+ * Contraste AA en ambos modos.
+ */
+:root {
+  /* Color — light */
+  --color-primary: #2563eb;
+  --color-on-primary: #ffffff;
+  --color-secondary: #3b82f6;
+  --color-on-secondary: #ffffff;
+  --color-accent: #16a34a;
+  --color-on-accent: #ffffff;
+  --color-whatsapp: #25d366;
+  --color-on-whatsapp: #052e16;
+  --color-background: #eff6ff;
+  --color-foreground: #1e40af;
+  --color-muted: #e9eff8;
+  --color-muted-foreground: #475569;
+  --color-card: #ffffff;
+  --color-card-foreground: #1e40af;
+  --color-border: #bfdbfe;
+  --color-destructive: #dc2626;
+  --color-on-destructive: #ffffff;
+  --color-ring: #2563eb;
+
+  /* Shape */
+  --radius-input: 8px;
+  --radius-card: 12px;
+
+  /* Elevación — una sola escala */
+  --shadow-sm: 0 1px 2px 0 rgb(30 64 175 / 0.06);
+  --shadow: 0 2px 8px -1px rgb(30 64 175 / 0.1);
+  --shadow-md: 0 6px 16px -2px rgb(30 64 175 / 0.14);
+}
+
+/* Dark por preferencia del sistema (salvo override explícito a light) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-primary: #3b82f6;
+    --color-on-primary: #06122b;
+    --color-secondary: #60a5fa;
+    --color-on-secondary: #06122b;
+    --color-accent: #22c55e;
+    --color-on-accent: #052e16;
+    --color-whatsapp: #25d366;
+    --color-on-whatsapp: #052e16;
+    --color-background: #0a0f1a;
+    --color-foreground: #e6eefb;
+    --color-muted: #16202e;
+    --color-muted-foreground: #9fb3cd;
+    --color-card: #111a28;
+    --color-card-foreground: #e6eefb;
+    --color-border: #24303f;
+    --color-destructive: #f87171;
+    --color-on-destructive: #1a0606;
+    --color-ring: #60a5fa;
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+    --shadow: 0 2px 8px -1px rgb(0 0 0 / 0.55);
+    --shadow-md: 0 6px 16px -2px rgb(0 0 0 / 0.6);
+  }
+}
+
+/* Dark forzado por toggle */
+:root[data-theme="dark"] {
+  --color-primary: #3b82f6;
+  --color-on-primary: #06122b;
+  --color-secondary: #60a5fa;
+  --color-on-secondary: #06122b;
+  --color-accent: #22c55e;
+  --color-on-accent: #052e16;
+  --color-whatsapp: #25d366;
+  --color-on-whatsapp: #052e16;
+  --color-background: #0a0f1a;
+  --color-foreground: #e6eefb;
+  --color-muted: #16202e;
+  --color-muted-foreground: #9fb3cd;
+  --color-card: #111a28;
+  --color-card-foreground: #e6eefb;
+  --color-border: #24303f;
+  --color-destructive: #f87171;
+  --color-on-destructive: #1a0606;
+  --color-ring: #60a5fa;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow: 0 2px 8px -1px rgb(0 0 0 / 0.55);
+  --shadow-md: 0 6px 16px -2px rgb(0 0 0 / 0.6);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-nunito), system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-rubik), system-ui, sans-serif;
+  }
+
+  /* Focus visible real (accesibilidad) */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
