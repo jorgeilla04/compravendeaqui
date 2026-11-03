@@ -41,3 +41,7 @@ postgres_data/
 
 # --- Misc ---
 *.log
+
+# Claude Code / Impeccable
+.claude/settings.local.json
+.claude/skills/impeccable/scripts/bin/

@@ -1,5 +1,8 @@
 # Pre-commit hooks. Instalar con:  pip install pre-commit && pre-commit install
 # Bloquea commits con código mal formateado o con errores de tipos/lint.
+# Código de terceros (skill de Impeccable): no se reformatea.
+exclude: ^\.claude/skills/
+
 default_language_version:
   python: python3
 
@@ -40,6 +43,11 @@ repos:
       - id: mypy
         files: ^backend/app/
         args: ["--config-file", "backend/pyproject.toml"]
+        # El hook corre en un entorno aislado: mismas versiones que requirements.txt.
         additional_dependencies:
-          - pydantic
-          - pydantic-settings
+          - fastapi==0.115.6
+          - pydantic==2.10.4
+          - pydantic-settings==2.7.1
+          - SQLAlchemy==2.0.36
+          - redis==5.2.1
+          - structlog==24.4.0

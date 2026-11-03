@@ -11,7 +11,7 @@ Paleta base azul, con verde para CTA y verde propio de WhatsApp para contacto.
 | Primary | `--color-primary` | `#2563EB` | Azul principal (acciones, links) |
 | On Primary | `--color-on-primary` | `#FFFFFF` | Texto sobre primary |
 | Secondary | `--color-secondary` | `#3B82F6` | Azul de apoyo |
-| Accent / CTA | `--color-accent` | `#16A34A` | Verde de acción (publicar, confirmar) |
+| Accent / CTA | `--color-accent` | `#15803D` | Verde de acción (publicar, confirmar). Ajustado desde `#16A34A` (texto blanco 3.3:1 → 5.0:1, AA) |
 | WhatsApp | `--color-whatsapp` | `#25D366` | **Solo** para el botón de contacto por WhatsApp |
 | Background | `--color-background` | `#EFF6FF` | Fondo general |
 | Foreground | `--color-foreground` | `#1E40AF` | Texto principal |

@@ -117,13 +117,26 @@ Rubik + Nunito Sans, radios, componentes) y [`Docs/PRODUCT.md`](Docs/PRODUCT.md)
 (usuarios y principios), con reglas anti-slop. Plan por fases en
 [`Docs/PLAN_CONSTRUCCION.md`](Docs/PLAN_CONSTRUCCION.md).
 
+[Impeccable](https://impeccable.style) controla el diseño: el skill y sus hooks
+viven en `.claude/` (Claude Code los pide aprobar al abrir la sesión), y el
+detector está como devDependency del frontend:
+
+```bash
+cd frontend
+npx impeccable detect app components          # anti-patrones en el código
+npm run build && npx next start -p 3000 &
+npx impeccable detect http://localhost:3000   # contraste y reglas de DOM
+```
+
+> **DoD de diseño:** ninguna pantalla se da por terminada con findings abiertos.
+
 ## CI
 
 GitHub Actions corre en cada push/PR a `main` y `develop`:
 
 - **backend** — black, isort, flake8, mypy, pytest
 - **frontend** — lint, type-check, test, build
-- **design-audit** — Impeccable audit (se activa al instalar Impeccable en el repo)
+- **design-audit** — `impeccable detect` sobre el código y sobre la página renderizada; falla con cualquier finding
 
 > Nota: existe un `docker-compose.yml` como opción de despliegue/portabilidad,
 > pero el flujo de desarrollo recomendado es local (esta guía).

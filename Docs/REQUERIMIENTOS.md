@@ -75,7 +75,7 @@ Plataforma moderna de clasificados/marketplace local para San Juan que supere a 
 | Primary | `#2563EB` | `--color-primary` |
 | On Primary | `#FFFFFF` | `--color-on-primary` |
 | Secondary | `#3B82F6` | `--color-secondary` |
-| Accent/CTA | `#16A34A` | `--color-accent` |
+| Accent/CTA | `#15803D` (antes `#16A34A`, ajustado por contraste AA — ver DESIGN.md) | `--color-accent` |
 | WhatsApp | `#25D366` | `--color-whatsapp` |
 | Background | `#EFF6FF` | `--color-background` |
 | Foreground | `#1E40AF` | `--color-foreground` |
