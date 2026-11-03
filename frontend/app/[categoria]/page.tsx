@@ -45,7 +45,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   const filters = { ...parseFilters(searchParams), category: category.slug };
   const [page, categories] = await Promise.all([
-    serverGet<ListingPage>("/listings", apiQuery(filters), 60).catch(
+    serverGet<ListingPage>("/listings", apiQuery(filters), false).catch(
       () => null,
     ),
     serverGet<CategoryNode[]>("/categories", undefined, 3600).catch(() => []),

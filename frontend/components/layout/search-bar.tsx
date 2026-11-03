@@ -137,7 +137,7 @@ export function SearchBar({
       />
       <button
         type="submit"
-        className="absolute right-1 top-1 h-9 rounded-input bg-primary px-4 text-meta font-semibold text-primary-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="absolute right-1 top-1 h-9 rounded-input bg-primary px-4 text-meta font-semibold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         Buscar
       </button>

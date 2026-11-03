@@ -14,7 +14,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-primary text-primary-foreground hover:bg-secondary",
+        primary: "bg-primary text-primary-foreground hover:bg-primary-hover",
         accent: "bg-accent text-accent-foreground hover:brightness-95",
         whatsapp:
           "rounded-pill bg-whatsapp text-whatsapp-foreground hover:brightness-95",

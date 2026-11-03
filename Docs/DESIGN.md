@@ -9,6 +9,7 @@ Paleta base azul, con verde para CTA y verde propio de WhatsApp para contacto.
 | Rol | Token | Light | Notas |
 |-----|-------|-------|-------|
 | Primary | `--color-primary` | `#2563EB` | Azul principal (acciones, links) |
+| Primary hover | `--color-primary-hover` | `#1D4ED8` | Hover de botones primarios (blanco encima 6,7:1, AA). En dark: `#60A5FA` |
 | On Primary | `--color-on-primary` | `#FFFFFF` | Texto sobre primary |
 | Secondary | `--color-secondary` | `#3B82F6` | Azul de apoyo |
 | Accent / CTA | `--color-accent` | `#15803D` | Verde de acción (publicar, confirmar). Ajustado desde `#16A34A` (texto blanco 3.3:1 → 5.0:1, AA) |
