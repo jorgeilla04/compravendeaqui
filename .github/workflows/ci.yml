@@ -78,10 +78,6 @@ jobs:
     name: Design audit (Impeccable)
     runs-on: ubuntu-latest
     needs: frontend
-    # TODO(Fase 0): quitar continue-on-error cuando Impeccable esté instalado
-    # en el repo frontend (`npx impeccable install`). Por ahora no bloquea el
-    # pipeline: el design system vive en Docs/DESIGN.md y Docs/PRODUCT.md.
-    continue-on-error: true
     defaults:
       run:
         working-directory: frontend
@@ -91,5 +87,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Impeccable audit
-        run: npx --yes impeccable audit || echo "Impeccable no instalado todavía — ver TODO."
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      # Escaneo estático: anti-patrones en el código fuente.
+      - name: Impeccable detect (source)
+        run: npx impeccable detect app components
+      # Escaneo de la página renderizada: corre las reglas que necesitan DOM
+      # (contraste, tamaño de texto). Usa el Chrome preinstalado del runner.
+      # Cualquier finding hace fallar el job (exit != 0).
+      - name: Impeccable detect (rendered page)
+        run: |
+          npx next start -p 3000 &
+          npx --yes wait-on --timeout 60000 http://localhost:3000
+          npx impeccable detect http://localhost:3000

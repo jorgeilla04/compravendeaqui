@@ -37,6 +37,7 @@
     "eslint": "8.57.1",
     "eslint-config-next": "14.2.15",
     "eslint-config-prettier": "9.1.0",
+    "impeccable": "^4.8.0",
     "jest": "29.7.0",
     "jest-environment-jsdom": "29.7.0",
     "postcss": "8.4.47",
