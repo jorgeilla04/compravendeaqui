@@ -9,3 +9,5 @@ venv/
 htmlcov/
 *.egg-info/
 .git/
+app/tests/
+.env.*

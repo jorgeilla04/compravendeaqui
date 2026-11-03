@@ -10,6 +10,14 @@ export const API_URL = (
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 ).replace(/\/$/, "");
 const PREFIX = "/api/v1";
+/**
+ * En el servidor (SSR/ISR) se puede usar una URL interna (p. ej. http://api:8000
+ * dentro de Docker) para no salir a internet y volver. Solo la lee el server.
+ */
+const SERVER_API_URL = (process.env.API_INTERNAL_URL ?? API_URL).replace(
+  /\/$/,
+  "",
+);
 
 export class ApiError extends Error {
   constructor(
@@ -24,8 +32,12 @@ export class ApiError extends Error {
 
 type Query = Record<string, string | number | null | undefined>;
 
-export function buildUrl(path: string, query?: Query): string {
-  const url = new URL(`${API_URL}${PREFIX}${path}`);
+export function buildUrl(
+  path: string,
+  query?: Query,
+  base: string = API_URL,
+): string {
+  const url = new URL(`${base}${PREFIX}${path}`);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== null && value !== undefined && value !== "") {
       url.searchParams.set(key, String(value));
@@ -59,7 +71,7 @@ export async function serverGet<T>(
   query?: Query,
   revalidate: number | false = 60,
 ): Promise<T | null> {
-  const response = await fetch(buildUrl(path, query), {
+  const response = await fetch(buildUrl(path, query, SERVER_API_URL), {
     next: revalidate === false ? undefined : { revalidate },
     cache: revalidate === false ? "no-store" : undefined,
   });

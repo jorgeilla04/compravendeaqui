@@ -11,15 +11,25 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
+# Las variables NEXT_PUBLIC_* quedan embebidas en el bundle: van en el build.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_MEDIA_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL \
+    NEXT_PUBLIC_MEDIA_URL=$NEXT_PUBLIC_MEDIA_URL \
+    NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # Stage 3: runtime
 FROM node:22-alpine AS runtime
 WORKDIR /app
+# HOSTNAME=0.0.0.0: Docker pone el id del contenedor en HOSTNAME y Next
+# escucharía solo en esa interfaz.
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs

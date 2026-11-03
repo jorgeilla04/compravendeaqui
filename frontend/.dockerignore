@@ -7,3 +7,10 @@ npm-debug.log*
 .git/
 Dockerfile
 .dockerignore
+.next-e2e/
+e2e/
+__tests__/
+test-utils/
+test-results/
+playwright-report/
+coverage/
