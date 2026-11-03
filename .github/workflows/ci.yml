@@ -176,7 +176,7 @@ jobs:
       - name: Start stack
         run: |
           e2e/start-stack.sh > stack.log 2>&1 &
-          npx --yes wait-on --timeout 300000 http://localhost:3010 http://localhost:8010/health
+          npx --yes wait-on --timeout 300000 http-get://localhost:3010 http-get://localhost:8010/health
       - name: Playwright
         working-directory: frontend
         run: npx playwright test
