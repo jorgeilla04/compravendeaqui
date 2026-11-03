@@ -1,3 +1,4 @@
+import { CONDITIONS, DEPARTMENTS } from "@/lib/constants";
 import type { Sort } from "@/lib/types";
 
 /** Parámetros de búsqueda que viajan en la URL (/buscar?q=…&department=…). */
@@ -24,6 +25,11 @@ const KEYS = [
 ] as const;
 
 const SORTS: Sort[] = ["relevance", "newest", "price_asc", "price_desc"];
+const ENUMS: Partial<Record<keyof SearchFilters, readonly string[]>> = {
+  department: DEPARTMENTS,
+  condition: CONDITIONS.map((c) => c.value),
+  currency: ["ARS", "USD"],
+};
 
 export function parseFilters(
   raw: Record<string, string | string[] | undefined>,
@@ -37,6 +43,9 @@ export function parseFilters(
       if (SORTS.includes(text as Sort)) filters.sort = text as Sort;
     } else if (key === "price_min" || key === "price_max") {
       if (/^\d+(\.\d+)?$/.test(text)) filters[key] = text;
+    } else if (ENUMS[key]) {
+      // Valores fuera de la lista se descartan (no son filtros válidos).
+      if (ENUMS[key]!.includes(text)) filters[key] = text;
     } else {
       filters[key] = text.slice(0, 120);
     }
@@ -69,4 +78,13 @@ export function apiQuery(
 
 export function endpointFor(filters: SearchFilters): "/search" | "/listings" {
   return filters.q ? "/search" : "/listings";
+}
+
+/**
+ * Segundos de caché del servidor para estos filtros. Solo se cachea cuando el
+ * espacio de combinaciones es acotado (rubro, departamento, condición, moneda,
+ * orden): con texto libre o rango de precio cada URL sería una entrada nueva.
+ */
+export function cacheSeconds(filters: SearchFilters): number | false {
+  return filters.q || filters.price_min || filters.price_max ? false : 5;
 }
