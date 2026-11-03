@@ -55,6 +55,7 @@ cp .env.example .env
 #   trust:  postgresql+psycopg://TU_USUARIO@localhost:5432/compravende
 #   clave:  postgresql+psycopg://usuario:clave@localhost:5432/compravende
 
+alembic upgrade head                     # esquema + categorías iniciales
 uvicorn app.main:app --reload            # http://localhost:8000
 # Si el 8000 está ocupado:  uvicorn app.main:app --reload --port 8001
 ```
@@ -72,7 +73,31 @@ curl http://localhost:8000/health/ready    # readiness → chequea Postgres + Re
 | Swagger docs | http://localhost:8000/docs |
 | Health | http://localhost:8000/health |
 
-### 3. Frontend
+### 3. Integraciones externas
+
+Todas son integraciones reales: se activan completando sus variables en
+`backend/.env` (cada una está documentada paso a paso en `.env.example`).
+Al arrancar, el backend loguea cuáles están conectadas.
+
+| Integración | Para qué | Variables | Sin configurar |
+|-------------|----------|-----------|----------------|
+| WhatsApp Cloud API (Meta) | Enviar el código de ingreso (canal principal) | `WHATSAPP_*` | Se usa el siguiente canal |
+| Twilio SMS | Respaldo si WhatsApp falla | `TWILIO_*` | Sin ningún canal, el ingreso responde **503** |
+| S3 / MinIO / R2 | Fotos de avisos y avatares | `S3_*` | Subir fotos responde **503** |
+| DolarApi | Cotización USD/ARS para filtrar y ordenar por precio | `FX_*` | Usa la última cotización conocida |
+
+Fotos en local con MinIO (`brew install minio && brew services start minio`):
+completar `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` con las credenciales de
+tu MinIO y crear el bucket una vez:
+
+```bash
+python -m app.scripts.setup_storage
+```
+
+Tareas programadas (cron diario): `python -m app.scripts.expire_listings`
+marca como vencidos los avisos de más de 90 días.
+
+### 4. Frontend
 
 ```bash
 cd frontend
@@ -100,6 +125,29 @@ npm run lint
 npm run type-check
 npm test
 npm run format
+```
+
+### E2E (flujos críticos) y performance
+
+Corren contra un stack aislado (base `compravende_e2e`, Redis 14, MinIO propio
+en :9100, backend en :8010, frontend en :3010). El OTP usa la integración real
+de WhatsApp Cloud API apuntada a un servidor falso de Meta
+(`e2e/fake-meta-server.mjs`) que guarda el código para que Playwright lo lea.
+
+```bash
+e2e/start-stack.sh                      # en una terminal
+cd frontend
+npm run test:e2e                         # 5 flujos × mobile + desktop
+npx playwright test --config e2e/perf.config.ts   # LCP/CLS mobile con throttling
+```
+
+Prueba de carga (100 usuarios concurrentes):
+
+```bash
+SKIP_FRONTEND=1 e2e/start-stack.sh      # en una terminal
+source e2e/env.sh && backend/.venv/bin/python loadtest/seed.py 5000
+backend/.venv/bin/locust -f loadtest/locustfile.py --host http://localhost:8010 \
+  --headless -u 100 -r 20 -t 60s
 ```
 
 ### Pre-commit (bloquea commits mal formateados)
@@ -134,8 +182,9 @@ npx impeccable detect http://localhost:3000   # contraste y reglas de DOM
 
 GitHub Actions corre en cada push/PR a `main` y `develop`:
 
-- **backend** — black, isort, flake8, mypy, pytest
+- **backend** — black, isort, flake8, mypy, pytest contra Postgres y Redis reales (cobertura mínima 80 %)
 - **frontend** — lint, type-check, test, build
+- **e2e** — Playwright sobre el stack completo (5 flujos críticos, mobile y desktop)
 - **design-audit** — `impeccable detect` sobre el código y sobre la página renderizada; falla con cualquier finding
 
 > Nota: existe un `docker-compose.yml` como opción de despliegue/portabilidad,

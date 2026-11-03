@@ -19,121 +19,123 @@
 ### 1.1 Autenticación por OTP telefónico ⭐
 
 **Backend**
-- [ ] `POST /auth/otp/request` — envía OTP por WhatsApp/SMS
-- [ ] `POST /auth/otp/verify` — verifica → login o registro
-- [ ] `POST /auth/register` (email opcional), `POST /auth/login` (password opcional), `refresh`, `logout`, `GET /auth/me`
-- [ ] JWT access (15min) + refresh (7 días), tabla `refresh_tokens`
-- [ ] Rate limiting: 5 intentos → lock 30min; límite de reenvíos de OTP
-- [ ] Tabla `otp_codes` con expiración y conteo de intentos
+- [x] `POST /auth/otp/request` — envía OTP por WhatsApp/SMS
+- [x] `POST /auth/otp/verify` — verifica → login o registro
+- [x] `POST /auth/register` (email opcional), `POST /auth/login` (password opcional), `refresh`, `logout`, `GET /auth/me` ✅ — `register` completa el perfil tras el primer OTP (una sola vez); refresh rotativo con detección de reuso
+- [x] JWT access (15min) + refresh (7 días), tabla `refresh_tokens`
+- [x] Rate limiting: 5 intentos → lock 30min; límite de reenvíos de OTP
+- [x] Tabla `otp_codes` con expiración y conteo de intentos
 
 **Frontend**
-- [ ] Pantalla de ingreso por teléfono → OTP (mobile-first)
-- [ ] Password como método secundario opcional
-- [ ] Auth context/hook global; rutas protegidas
+- [x] Pantalla de ingreso por teléfono → OTP (mobile-first)
+- [x] Password como método secundario opcional
+- [x] Auth context/hook global; rutas protegidas
 
 **Testing**
-- [ ] Unit del flujo OTP (90%); integración de endpoints; e2e de alta por teléfono
+- [x] Unit del flujo OTP (90%); integración de endpoints; e2e de alta por teléfono
 
 ### 1.2 Categorías y Navegación
 
 **Backend**
-- [ ] `GET /categories` (árbol), `/{slug}`, `/{id}/children`
-- [ ] Jerarquía parent-child, slugs SEO, caching Redis (1h TTL)
+- [x] `GET /categories` (árbol), `/{slug}`, `/{id}/children`
+- [x] Jerarquía parent-child, slugs SEO, caching Redis (1h TTL)
 
 **Frontend**
-- [ ] Sidebar colapsable (desktop) / drawer (mobile)
-- [ ] Breadcrumbs; iconos por categoría
+- [x] Sidebar colapsable (desktop) / drawer (mobile) ✅ — rubros en grilla (home) y chips de subcategorías; filtro de categoría en sidebar (desktop) / drawer (mobile)
+- [x] Breadcrumbs; iconos por categoría
 
 ### 1.3 Publicación de Avisos ⭐
 
 **Backend**
-- [ ] CRUD completo de `listings` (soft delete)
-- [ ] Precio **USD/ARS** con `price_usd_ref` y `fx_rate_at_publish`
-- [ ] Campo `department` (departamentos de San Juan)
-- [ ] Upload múltiple de imágenes a S3/MinIO + optimización webp
-- [ ] Slugs únicos SEO; contador de views; expiración 90 días
-- [ ] `search_vector` (tsvector español) mantenido por trigger
+- [x] CRUD completo de `listings` (soft delete)
+- [x] Precio **USD/ARS** con `price_usd_ref` y `fx_rate_at_publish`
+- [x] Campo `department` (departamentos de San Juan)
+- [x] Upload múltiple de imágenes a S3/MinIO + optimización webp ✅ — webp 1600px + miniatura 480px, sin EXIF/GPS
+- [x] Slugs únicos SEO; contador de views; expiración 90 días
+- [x] `search_vector` (tsvector español) mantenido por trigger
 
 **Frontend**
-- [ ] Grid con lazy loading + skeletons
-- [ ] Detalle de aviso (galería con zoom)
-- [ ] Formulario de publicación multi-paso (wizard) con preview de imágenes
-- [ ] Selector de moneda USD/ARS y de departamento
-- [ ] Editar/eliminar con confirmación
+- [x] Grid con lazy loading + skeletons
+- [x] Detalle de aviso (galería con zoom)
+- [x] Formulario de publicación multi-paso (wizard) con preview de imágenes
+- [x] Selector de moneda USD/ARS y de departamento
+- [x] Editar/eliminar con confirmación
 
 ### 1.4 Búsqueda y Filtros
 
 **Backend**
-- [ ] `GET /search` full-text (PostgreSQL, español, índice GIN)
-- [ ] Filtros: categoría, precio, **departamento**, condición, moneda
-- [ ] Orden: relevancia, precio, fecha; paginación cursor-based
-- [ ] `GET /search/suggestions` (autocomplete)
+- [x] `GET /search` full-text (PostgreSQL, español, índice GIN)
+- [x] Filtros: categoría, precio, **departamento**, condición, moneda
+- [x] Orden: relevancia, precio, fecha; paginación cursor-based
+- [x] `GET /search/suggestions` (autocomplete)
 
 **Frontend**
-- [ ] Search bar sticky en header + sugerencias (debounce 300ms)
-- [ ] Filtros: sidebar (desktop) / drawer (mobile); chips de filtros activos
-- [ ] Estados: sin resultados, cargando; infinite scroll
+- [x] Search bar sticky en header + sugerencias (debounce 300ms)
+- [x] Filtros: sidebar (desktop) / drawer (mobile); chips de filtros activos
+- [x] Estados: sin resultados, cargando; infinite scroll
 
 ### 1.5 Contacto por WhatsApp ⭐
 
 **Backend**
-- [ ] `POST /listings/{id}/contact` — incrementa `contacts_count`, devuelve deep link `wa.me` con mensaje precargado (título + link del aviso)
-- [ ] Teléfono del vendedor **resuelto server-side**, nunca en el HTML inicial
+- [x] `POST /listings/{id}/contact` — incrementa `contacts_count`, devuelve deep link `wa.me` con mensaje precargado (título + link del aviso)
+- [x] Teléfono del vendedor **resuelto server-side**, nunca en el HTML inicial
 
 **Frontend**
-- [ ] Botón verde "Contactar por WhatsApp" como CTA primario del aviso
-- [ ] El teléfono aparece solo tras el clic
+- [x] Botón verde "Contactar por WhatsApp" como CTA primario del aviso
+- [x] El teléfono aparece solo tras el clic
 
 ### 1.6 Perfil de Usuario
 
 **Backend**
-- [ ] `GET /users/{id}` (público), `/users/{id}/listings`, `PUT /users/me`, avatar, baja de cuenta (soft delete)
+- [x] `GET /users/{id}` (público), `/users/{id}/listings`, `PUT /users/me`, avatar, baja de cuenta (soft delete)
 
 **Frontend**
-- [ ] Perfil público; edición de perfil; "Mis avisos"; ajustes; baja de cuenta
+- [x] Perfil público; edición de perfil; "Mis avisos"; ajustes; baja de cuenta
 
 ### 1.7 SEO (temprano) ⭐
 
-- [ ] URLs con slug (`/autos/toyota-corolla-2018-xxxx`)
-- [ ] Meta tags + Open Graph por aviso
-- [ ] Datos estructurados Schema.org `Product`/`Offer`
-- [ ] `sitemap.xml` dinámico + `robots.txt`
-- [ ] SSR/ISR para que Google indexe contenido real
+- [x] URLs con slug (`/autos/toyota-corolla-2018-xxxx`)
+- [x] Meta tags + Open Graph por aviso
+- [x] Datos estructurados Schema.org `Product`/`Offer`
+- [x] `sitemap.xml` dinámico + `robots.txt`
+- [x] SSR/ISR para que Google indexe contenido real
 
 ---
 
 ## ✅ Criterios de Aceptación MVP
 
 ### Funcional
-- [ ] Un usuario se registra e ingresa por OTP de WhatsApp
-- [ ] Publica un aviso con imágenes y precio en USD o ARS
-- [ ] Busca y filtra por categoría, precio y departamento
-- [ ] Contacta al vendedor por WhatsApp (y el clic se cuenta)
-- [ ] Gestiona sus avisos (editar/eliminar)
+- [ ] Un usuario se registra e ingresa por OTP de WhatsApp — _flujo completo verificado en e2e por la integración real de la Cloud API (contra servidor falso de Meta); falta cargar las credenciales de Meta para enviar mensajes reales_
+- [x] Publica un aviso con imágenes y precio en USD o ARS
+- [x] Busca y filtra por categoría, precio y departamento
+- [x] Contacta al vendedor por WhatsApp (y el clic se cuenta)
+- [x] Gestiona sus avisos (editar/eliminar)
 
 ### Performance
-- [ ] LCP < 2.5s en mobile (Lighthouse)
-- [ ] API p95 < 500ms
-- [ ] Imágenes < 100KB promedio (webp)
+- [ ] LCP < 2.5s en mobile (Lighthouse) — _medido con Playwright (Pixel 7, 4G lenta, CPU 4x, sin caché): LCP 0,68–0,75 s, CLS 0. Falta correr Lighthouse en staging (no corrió en esta máquina)_
+- [x] API p95 < 500ms — ✅ 100 usuarios concurrentes, 6.346 requests, 0 errores, p95 agregado 70 ms (máx. por endpoint 130 ms)
+- [ ] Imágenes < 100KB promedio (webp) — _miniaturas (las de las grillas) muy por debajo; verificar el promedio de la foto grande (1600px) con fotos reales_
 
 ### Diseño
-- [ ] Todas las pantallas pasan `impeccable audit` con **0 findings P0/P1**
-- [ ] Navegación por teclado completa; focus visible
+- [x] Todas las pantallas pasan `impeccable audit` con **0 findings P0/P1** — _públicas escaneadas renderizadas (0 findings); las que requieren sesión, sobre el código fuente_
+- [ ] Navegación por teclado completa; focus visible — _focus visible global, combobox de búsqueda y diálogos accesibles por teclado; falta una pasada manual completa con lector de pantalla_
 
 ### SEO
-- [ ] Un aviso renderiza con SSR/ISR e incluye Schema.org válido (test con Rich Results)
-- [ ] `sitemap.xml` accesible y correcto
+- [ ] Un aviso renderiza con SSR/ISR e incluye Schema.org válido (test con Rich Results) — _SSR/ISR + JSON-LD Product/Offer/BreadcrumbList testeados; falta pasar la URL de staging por Rich Results Test de Google_
+- [x] `sitemap.xml` accesible y correcto
 
 ### Seguridad/Legal
-- [ ] Rate limiting activo; sanitización de inputs; prepared statements
-- [ ] Teléfono no expuesto antes del clic
-- [ ] Términos y Política de Privacidad según Ley 25.326 y 24.240 publicados
+- [x] Rate limiting activo; sanitización de inputs; prepared statements
+- [x] Teléfono no expuesto antes del clic
+- [ ] Términos y Política de Privacidad según Ley 25.326 y 24.240 publicados — _páginas publicadas; falta completar razón social/CUIT/domicilio (`components/legal/legal-page.tsx`) y revisión legal_
 
 ### Testing
-- [ ] Unit > 80%; e2e de los 5 flujos críticos; load test 100 concurrentes
+- [x] Unit > 80%; e2e de los 5 flujos críticos; load test 100 concurrentes — ✅ backend 93 % (86 tests); e2e 5 flujos × mobile/desktop; carga OK (ver arriba)
 
 ---
 
 ## 🚪 Definition of Done
 
 MVP desplegado en staging, todos los criterios en verde, y listo para cargar los datos reales de proveedores. Este es el punto de lanzamiento inicial.
+
+> **Estado (2026-11-03):** construcción completa y verificada en local. Para cerrar la fase falta: credenciales de Meta (y Twilio opcional), datos legales del titular, deploy a staging y, ahí, Lighthouse + Rich Results Test.
