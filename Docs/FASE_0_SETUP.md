@@ -66,7 +66,7 @@
 > opcional**, no como criterio de aceptación.
 
 ### CI/CD
-- [ ] Un PR de prueba dispara el pipeline y pasa (tests + build + audit) — _pendiente: falta permiso de push al repo remoto_
+- [x] Un PR de prueba dispara el pipeline y pasa (tests + build + audit) — PR #1
 - [x] Pre-commit bloquea código mal formateado
 
 ### Diseño
