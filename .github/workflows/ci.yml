@@ -10,6 +10,27 @@ jobs:
   backend:
     name: Backend (test + lint)
     runs-on: ubuntu-latest
+    # Los tests corren contra Postgres y Redis reales (migraciones de Alembic).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: compravende_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/compravende_test
+      TEST_REDIS_URL: redis://localhost:6379/15
     defaults:
       run:
         working-directory: backend
@@ -41,7 +62,7 @@ jobs:
         run: mypy app
 
       - name: pytest
-        run: pytest --cov=app --cov-report=term-missing
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=80
 
   frontend:
     name: Frontend (build + test)

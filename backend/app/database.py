@@ -12,7 +12,7 @@ from app.config import settings
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
-    echo=settings.debug and not settings.is_production,
+    echo=settings.sql_echo,
     future=True,
 )
 
