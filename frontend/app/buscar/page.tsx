@@ -24,12 +24,11 @@ export function generateMetadata({ searchParams }: Props): Metadata {
 export default async function SearchPage({ searchParams }: Props) {
   const filters = parseFilters(searchParams);
   const [page, categories] = await Promise.all([
-    // Sin caché: un aviso recién publicado tiene que aparecer al toque.
-    serverGet<ListingPage>(
-      endpointFor(filters),
-      apiQuery(filters),
-      false,
-    ).catch(() => null),
+    // Caché corta (5 s): agrupa visitas repetidas y un aviso recién
+    // publicado aparece casi al instante.
+    serverGet<ListingPage>(endpointFor(filters), apiQuery(filters), 5).catch(
+      () => null,
+    ),
     serverGet<CategoryNode[]>("/categories", undefined, 3600).catch(() => []),
   ]);
 
