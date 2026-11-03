@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     otp_ttl_minutes: int = 5
     otp_resend_cooldown_seconds: int = 60
     otp_max_sends_per_hour: int = 5
+    # Pedidos de OTP por IP y por hora (anti-abuso del costo de envío).
+    otp_max_requests_per_ip_hour: int = 20
     # Canales en orden de preferencia: si el primero falla se usa el siguiente.
     otp_channels: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["whatsapp", "sms"]

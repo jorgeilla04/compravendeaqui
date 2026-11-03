@@ -227,3 +227,19 @@ def test_my_listings_include_all_states(make_user: MakeUser, category_id: str) -
     mine = seller.get("/api/v1/users/me/listings").json()
     assert {item["status"] for item in mine} == {"active", "draft"}
     assert all("contacts_count" in item for item in mine)
+
+
+def test_owner_cannot_reactivate_suspended_listing(
+    make_user: MakeUser, category_id: str, db: Any
+) -> None:
+    from app.models import Listing
+
+    seller, _ = make_user()
+    listing = create_listing(seller, category_id)
+    row = db.get(Listing, listing["id"])
+    row.status = "suspended"
+    db.commit()
+    path = f"/api/v1/listings/{listing['id']}"
+    assert seller.put(path, json={"status": "active"}).status_code == 409
+    assert seller.put(path, json={"title": "Otro título largo"}).status_code == 409
+    assert seller.delete(path).status_code == 204

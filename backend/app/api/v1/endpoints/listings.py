@@ -5,7 +5,15 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, File, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    File,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 
 from app.api.deps import CurrentUser, DbSession, OptionalUser
 from app.core import ratelimit
@@ -58,6 +66,12 @@ def update(
     listing_id: uuid.UUID, body: ListingUpdate, user: CurrentUser, db: DbSession
 ) -> OwnerListingOut:
     listing = listing_service.get_owned(db, listing_id, user)
+    if listing.status == "suspended" and user.role not in ("admin", "moderator"):
+        # Lo suspendió moderación: el dueño solo puede eliminarlo.
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail="Este aviso está suspendido por moderación y no se puede editar",
+        )
     listing = listing_service.update_listing(db, listing, body)
     return listing_service.to_out(listing, owner=True)  # type: ignore[return-value]
 

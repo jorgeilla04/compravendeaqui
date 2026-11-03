@@ -70,7 +70,10 @@ def request_otp(
 
     # Límites de reenvío: por IP (anti-abuso de costo) y por teléfono.
     ratelimit.enforce(
-        f"rl:otp:ip:{ip}", 20, 3600, "Demasiadas solicitudes. Probá más tarde."
+        f"rl:otp:ip:{ip}",
+        settings.otp_max_requests_per_ip_hour,
+        3600,
+        "Demasiadas solicitudes. Probá más tarde.",
     )
     cooldown_key = f"otp:cooldown:{phone}"
     r = get_redis()
