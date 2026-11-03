@@ -64,5 +64,10 @@ describe("validación y caché acotada", () => {
     expect(cacheSeconds({ department: "Capital", sort: "newest" })).toBe(5);
     expect(cacheSeconds({ q: "auto" })).toBe(false);
     expect(cacheSeconds({ price_max: "1000" })).toBe(false);
+    // Rubro arbitrario desde /buscar: en vivo; verificado por la página: cacheable.
+    expect(cacheSeconds({ category: "lo-que-sea" })).toBe(false);
+    expect(
+      cacheSeconds({ category: "autos" }, { categoryVerified: true }),
+    ).toBe(5);
   });
 });

@@ -53,7 +53,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     serverGet<ListingPage>(
       "/listings",
       apiQuery(filters),
-      cacheSeconds(filters),
+      cacheSeconds(filters, { categoryVerified: true }),
     ).catch(() => null),
     serverGet<CategoryNode[]>("/categories", undefined, 3600).catch(() => []),
   ]);

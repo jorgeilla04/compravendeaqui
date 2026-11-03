@@ -82,9 +82,19 @@ export function endpointFor(filters: SearchFilters): "/search" | "/listings" {
 
 /**
  * Segundos de caché del servidor para estos filtros. Solo se cachea cuando el
- * espacio de combinaciones es acotado (rubro, departamento, condición, moneda,
- * orden): con texto libre o rango de precio cada URL sería una entrada nueva.
+ * espacio de combinaciones es acotado (departamento, condición, moneda, orden y
+ * un rubro verificado): con texto libre, rango de precio o un rubro arbitrario
+ * cada URL sería una entrada nueva.
  */
-export function cacheSeconds(filters: SearchFilters): number | false {
-  return filters.q || filters.price_min || filters.price_max ? false : 5;
+export function cacheSeconds(
+  filters: SearchFilters,
+  { categoryVerified = false }: { categoryVerified?: boolean } = {},
+): number | false {
+  // La categoría solo cuenta como acotada si la página ya verificó que existe.
+  const unbounded =
+    filters.q ||
+    filters.price_min ||
+    filters.price_max ||
+    (filters.category && !categoryVerified);
+  return unbounded ? false : 5;
 }
