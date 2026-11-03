@@ -7,7 +7,13 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 
-from app.api.deps import CurrentUser, DbSession, clear_auth_cookies, set_auth_cookies
+from app.api.deps import (
+    CompleteUser,
+    CurrentUser,
+    DbSession,
+    clear_auth_cookies,
+    set_auth_cookies,
+)
 from app.core.security import verify_password
 from app.schemas.listing import ListingPage, OwnerListingOut
 from app.schemas.user import MeOut, PasswordSetIn, PublicProfileOut, UserUpdateIn
@@ -29,13 +35,13 @@ def my_listings(user: CurrentUser, db: DbSession) -> list[OwnerListingOut]:
 
 
 @router.put("/me", response_model=MeOut)
-def update_me(body: UserUpdateIn, user: CurrentUser, db: DbSession) -> MeOut:
+def update_me(body: UserUpdateIn, user: CompleteUser, db: DbSession) -> MeOut:
     return user_service.to_me(user_service.update_profile(db, user, body))
 
 
 @router.post("/me/avatar", response_model=MeOut)
 async def upload_avatar(
-    user: CurrentUser, db: DbSession, file: Annotated[UploadFile, File()]
+    user: CompleteUser, db: DbSession, file: Annotated[UploadFile, File()]
 ) -> MeOut:
     return user_service.to_me(await user_service.set_avatar(db, user, file))
 
@@ -47,7 +53,7 @@ async def upload_avatar(
     response_model=None,
 )
 def set_password(
-    body: PasswordSetIn, user: CurrentUser, db: DbSession, response: Response
+    body: PasswordSetIn, user: CompleteUser, db: DbSession, response: Response
 ) -> Response:
     """Crea o cambia la contraseña. Cierra todas las demás sesiones."""
     if user.password_hash and not (

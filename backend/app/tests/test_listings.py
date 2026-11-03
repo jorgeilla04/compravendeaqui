@@ -243,3 +243,55 @@ def test_owner_cannot_reactivate_suspended_listing(
     assert seller.put(path, json={"status": "active"}).status_code == 409
     assert seller.put(path, json={"title": "Otro título largo"}).status_code == 409
     assert seller.delete(path).status_code == 204
+
+
+def test_pending_profile_cannot_publish(
+    client: TestClient, otp_sender: Any, category_id: str
+) -> None:
+    client.post("/api/v1/auth/otp/request", json={"phone": "2644321987"})
+    client.post(
+        "/api/v1/auth/otp/verify",
+        json={"phone": "2644321987", "code": otp_sender.last_code()},
+    )
+    response = client.post(
+        "/api/v1/listings",
+        json={
+            "title": "Moto 110cc",
+            "description": "Anda perfecto, papeles al día.",
+            "category_id": category_id,
+            "department": "Capital",
+        },
+    )
+    assert response.status_code == 403
+    assert (
+        client.put("/api/v1/users/me", json={"full_name": "Sin términos"}).status_code
+        == 403
+    )
+    # Los derechos sobre los datos siguen disponibles.
+    assert client.get("/api/v1/users/me/export").status_code == 200
+
+
+def test_suspended_listing_photos_are_locked(
+    make_user: MakeUser, category_id: str, db: Any
+) -> None:
+    from app.models import Listing
+
+    seller, _ = make_user()
+    listing = create_listing(seller, category_id)
+    base = f"/api/v1/listings/{listing['id']}/images"
+    image_id = seller.post(
+        base, files=[("files", ("a.jpg", jpeg_bytes((80, 80)), "image/jpeg"))]
+    ).json()["images"][0]["id"]
+    row = db.get(Listing, listing["id"])
+    row.status = "suspended"
+    db.commit()
+    assert (
+        seller.post(
+            base, files=[("files", ("b.jpg", jpeg_bytes((80, 80)), "image/jpeg"))]
+        ).status_code
+        == 409
+    )
+    assert (
+        seller.put(f"{base}/order", json={"image_ids": [image_id]}).status_code == 409
+    )
+    assert seller.delete(f"{base}/{image_id}").status_code == 409

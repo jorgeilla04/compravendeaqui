@@ -11,12 +11,17 @@ redis-cli -n 14 flushdb >/dev/null
 
 trap 'kill 0' EXIT
 node "$ROOT/e2e/fake-meta-server.mjs" &
-mkdir -p "$ROOT/e2e/.minio-data"
-minio server "$ROOT/e2e/.minio-data" --address :9100 --console-address :9101 >/dev/null 2>&1 &
+# S3 de e2e: MinIO si está instalado; si no (CI), moto_server (pip install "moto[server]").
+if command -v minio >/dev/null; then
+  mkdir -p "$ROOT/e2e/.minio-data"
+  minio server "$ROOT/e2e/.minio-data" --address :9100 --console-address :9101 >/dev/null 2>&1 &
+else
+  "$ROOT/backend/.venv/bin/moto_server" -p 9100 >/dev/null 2>&1 &
+fi
 
 cd "$ROOT/backend"
 .venv/bin/alembic upgrade head >/dev/null
-for _ in $(seq 1 30); do curl -sf localhost:9100/minio/health/live >/dev/null && break; sleep 0.5; done
+for _ in $(seq 1 30); do curl -s -o /dev/null localhost:9100 && break; sleep 0.5; done
 .venv/bin/python -m app.scripts.setup_storage
 .venv/bin/uvicorn app.main:app --port 8010 --log-level warning &
 

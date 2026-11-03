@@ -56,6 +56,19 @@ def get_current_user(user: Annotated[User | None, Depends(get_optional_user)]) -
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def get_complete_user(user: CurrentUser) -> User:
+    """Usuario con el perfil completo (aceptó términos y privacidad en el alta)."""
+    if user.profile_pending:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Completá tu perfil y aceptá los términos para continuar",
+        )
+    return user
+
+
+CompleteUser = Annotated[User, Depends(get_complete_user)]
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 
 

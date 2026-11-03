@@ -164,13 +164,12 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install tools (psql, redis-cli, MinIO)
+      - name: Install tools (psql, redis-cli)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client redis-tools
+      - name: Backend deps (+ moto como S3 de e2e)
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client redis-tools
-          curl -sSfL -o minio https://dl.min.io/server/minio/release/linux-amd64/minio
-          chmod +x minio && sudo mv minio /usr/local/bin/
-      - name: Backend deps
-        run: python -m venv backend/.venv && backend/.venv/bin/pip install -q -r backend/requirements.txt
+          python -m venv backend/.venv
+          backend/.venv/bin/pip install -q -r backend/requirements.txt "moto[server]==5.2.5"
       - name: Frontend deps + Playwright
         working-directory: frontend
         run: npm ci && npx playwright install --with-deps chromium
