@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from urllib.parse import urlsplit
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -16,26 +17,41 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 class OriginCheckMiddleware(BaseHTTPMiddleware):
     """Defensa CSRF para la sesión por cookie.
 
-    Las cookies son SameSite=Lax; además, toda request que modifica estado y
-    trae Origin/Referer debe venir de un origen propio (CORS_ORIGINS).
-    Clientes sin navegador (sin Origin) usan Bearer y no son vulnerables.
+    Las cookies son SameSite=Lax; además, toda request que modifica estado
+    debe venir de un origen propio (CORS_ORIGINS). Si usa la sesión por cookie
+    y no trae Origin ni Referer, se rechaza. Los clientes sin navegador usan
+    Bearer y no son vulnerables a CSRF.
     """
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         if request.method in UNSAFE_METHODS:
-            origin = request.headers.get("origin")
-            if origin is None:
-                referer = request.headers.get("referer")
-                if referer:
-                    parts = referer.split("/")
-                    origin = "/".join(parts[:3]) if len(parts) >= 3 else referer
+            origin = request.headers.get("origin") or _origin_of(
+                request.headers.get("referer")
+            )
+            uses_cookie_session = not request.headers.get("authorization") and bool(
+                request.cookies
+            )
+            if origin is None and uses_cookie_session:
+                # Sesión por cookie sin Origin ni Referer: no se puede verificar.
+                return _forbidden()
             if origin is not None and origin not in settings.cors_origins:
-                return JSONResponse(
-                    status_code=403, content={"detail": "Origen no permitido"}
-                )
+                return _forbidden()
         return await call_next(request)
+
+
+def _origin_of(url: str | None) -> str | None:
+    if not url:
+        return None
+    parts = urlsplit(url)
+    if not parts.scheme or not parts.netloc:
+        return None
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+def _forbidden() -> JSONResponse:
+    return JSONResponse(status_code=403, content={"detail": "Origen no permitido"})
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

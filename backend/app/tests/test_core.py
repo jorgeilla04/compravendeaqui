@@ -123,3 +123,41 @@ def test_sitemap(make_user: MakeUser, category_id: str, client: TestClient) -> N
     listing = create_listing(seller, category_id)
     paths = [e["path"] for e in client.get("/api/v1/seo/sitemap").json()]
     assert "/autos" in paths and listing["url_path"] in paths
+
+
+def test_cookie_session_without_origin_is_rejected(client: TestClient) -> None:
+    bare = TestClient(client.app)
+    bare.cookies.set("cva_access", "x")
+    assert bare.post("/api/v1/auth/logout").status_code == 403
+    # Sin cookies (cliente API con Bearer) no aplica.
+    assert TestClient(client.app).post("/api/v1/auth/logout").status_code == 204
+
+
+def test_spoofed_real_ip_from_untrusted_peer_is_ignored(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from starlette.requests import Request
+
+    from app.config import settings
+    from app.core.ratelimit import client_ip
+
+    def request(peer: str) -> Request:
+        scope = {
+            "type": "http",
+            "headers": [(b"x-real-ip", b"1.2.3.4")],
+            "client": (peer, 1),
+        }
+        return Request(scope)
+
+    monkeypatch.setattr(settings, "trusted_proxies", ["127.0.0.1"])
+    assert client_ip(request("127.0.0.1")) == "1.2.3.4"
+    assert client_ip(request("8.8.8.8")) == "8.8.8.8"
+
+
+def test_production_requires_secure_cookies() -> None:
+    from app.config import Settings
+
+    with pytest.raises(ValueError, match="COOKIE_SECURE"):
+        Settings(environment="production", jwt_secret_key="x" * 40, cookie_secure=False)
+    with pytest.raises(ValueError, match="JWT_SECRET_KEY"):
+        Settings(environment="production", cookie_secure=True)

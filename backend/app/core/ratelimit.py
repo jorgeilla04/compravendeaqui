@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException, Request, status
 
+from app.config import settings
 from app.core.redis import get_redis
 
 
@@ -29,12 +30,17 @@ def enforce(key: str, limit: int, window_seconds: int, detail: str) -> None:
 
 
 def client_ip(request: Request) -> str:
-    # Detrás de Nginx/Cloudflare: Nginx debe setear X-Real-IP (ver nginx.conf).
-    return (
-        request.headers.get("x-real-ip")
-        or (request.client.host if request.client else None)
-        or "unknown"
-    )
+    """IP real del cliente.
+
+    X-Real-IP solo se respeta si la conexión viene de un proxy de confianza
+    (TRUSTED_PROXIES, p. ej. el Nginx local); si no, cualquiera podría
+    falsificarlo para saltear los límites.
+    """
+    peer = request.client.host if request.client else None
+    forwarded = request.headers.get("x-real-ip")
+    if forwarded and peer in settings.trusted_proxies:
+        return forwarded.strip()
+    return peer or "unknown"
 
 
 class Lockout:

@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     # Cookies httpOnly con los tokens (el frontend no toca los JWT).
     cookie_secure: bool = False
     cookie_domain: str | None = None
+    # IPs de los proxies (Nginx) cuyo X-Real-IP se respeta para rate limiting.
+    trusted_proxies: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["127.0.0.1", "::1"]
+    )
     bcrypt_rounds: int = 12
 
     # Bloqueo por intentos fallidos (OTP y password)
@@ -110,7 +114,7 @@ class Settings(BaseSettings):
     # --- Avisos ---
     listing_ttl_days: int = 90
 
-    @field_validator("cors_origins", "otp_channels", mode="before")
+    @field_validator("cors_origins", "otp_channels", "trusted_proxies", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
         """Permite pasar listas como cadena separada por comas."""
@@ -122,6 +126,8 @@ class Settings(BaseSettings):
     def _check_production_secrets(self) -> Settings:
         if self.is_production and self.jwt_secret_key == _DEV_JWT_SECRET:
             raise ValueError("JWT_SECRET_KEY es obligatorio en producción")
+        if self.is_production and not self.cookie_secure:
+            raise ValueError("COOKIE_SECURE=true es obligatorio en producción")
         return self
 
     @property

@@ -267,3 +267,48 @@ def test_suspended_user_cannot_login(
         "/api/v1/auth/otp/verify", json={"phone": PHONE, "code": otp_sender.last_code()}
     )
     assert response.status_code == 403
+
+
+def test_register_only_once(client: TestClient, otp_sender: RecordingSender) -> None:
+    login(client, otp_sender, PHONE)
+    again = client.post(
+        "/api/v1/auth/register",
+        json={
+            "username": "otro.nombre",
+            "full_name": "Otro",
+            "password": "pisar-la-clave",
+            "accept_terms": True,
+        },
+    )
+    assert again.status_code == 409
+
+
+def test_password_change_closes_other_sessions(
+    client: TestClient, otp_sender: RecordingSender
+) -> None:
+    from app.core.redis import get_redis
+
+    login(client, otp_sender, PHONE)
+    other_device = TestClient(client.app, headers={"Origin": "http://localhost:3000"})
+    get_redis().delete(f"otp:cooldown:{E164}")
+    other_device.post("/api/v1/auth/otp/request", json={"phone": PHONE})
+    other_device.post(
+        "/api/v1/auth/otp/verify", json={"phone": PHONE, "code": otp_sender.last_code()}
+    )
+    other_refresh = other_device.cookies.get("cva_refresh")
+
+    assert (
+        client.put(
+            "/api/v1/users/me/password", json={"new_password": "nueva-clave-123"}
+        ).status_code
+        == 204
+    )
+    # La sesión actual sigue (cookies nuevas); la del otro dispositivo, no.
+    assert client.get("/api/v1/auth/me").status_code == 200
+    assert client.post("/api/v1/auth/refresh").status_code == 200
+    assert (
+        other_device.post(
+            "/api/v1/auth/refresh", json={"refresh_token": other_refresh}
+        ).status_code
+        == 401
+    )

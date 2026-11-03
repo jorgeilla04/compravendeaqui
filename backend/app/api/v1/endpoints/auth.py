@@ -75,7 +75,15 @@ def otp_verify(body: OtpVerifyIn, response: Response, db: DbSession) -> AuthOut:
 
 @router.post("/register", response_model=MeOut)
 def register(body: RegisterIn, user: CurrentUser, db: DbSession) -> MeOut:
-    """Completa el perfil del usuario recién verificado (email/password opcionales)."""
+    """Completa el perfil del usuario recién verificado (email/password opcionales).
+
+    Solo sirve una vez, en el alta: después el perfil se edita en /users/me y la
+    contraseña en /users/me/password (que pide la actual).
+    """
+    if not user.profile_pending:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, detail="Tu perfil ya está completo"
+        )
     user_service.update_profile(
         db,
         user,

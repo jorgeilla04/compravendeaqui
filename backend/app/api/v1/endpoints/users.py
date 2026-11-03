@@ -7,7 +7,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 
-from app.api.deps import CurrentUser, DbSession, clear_auth_cookies
+from app.api.deps import CurrentUser, DbSession, clear_auth_cookies, set_auth_cookies
 from app.core.security import verify_password
 from app.schemas.listing import ListingPage, OwnerListingOut
 from app.schemas.user import MeOut, PasswordSetIn, PublicProfileOut, UserUpdateIn
@@ -46,7 +46,10 @@ async def upload_avatar(
     response_class=Response,
     response_model=None,
 )
-def set_password(body: PasswordSetIn, user: CurrentUser, db: DbSession) -> None:
+def set_password(
+    body: PasswordSetIn, user: CurrentUser, db: DbSession, response: Response
+) -> Response:
+    """Crea o cambia la contraseña. Cierra todas las demás sesiones."""
     if user.password_hash and not (
         body.current_password
         and verify_password(body.current_password, user.password_hash)
@@ -56,6 +59,10 @@ def set_password(body: PasswordSetIn, user: CurrentUser, db: DbSession) -> None:
         )
     auth_service.set_password(user, body.new_password)
     db.commit()
+    auth_service.revoke_all(db, user.id)
+    set_auth_cookies(response, auth_service.issue_session(db, user))
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
 
 
 @router.get("/me/export")

@@ -18,6 +18,7 @@ os.environ["REDIS_URL"] = os.environ.get("TEST_REDIS_URL", "redis://localhost:63
 os.environ["ENVIRONMENT"] = "test"
 os.environ["BCRYPT_ROUNDS"] = "4"
 os.environ["CORS_ORIGINS"] = "http://localhost:3000"
+os.environ["TRUSTED_PROXIES"] = "testclient"
 os.environ["PUBLIC_SITE_URL"] = "https://compravendeaqui.test"
 for _secret in (
     "WHATSAPP_PHONE_NUMBER_ID",
