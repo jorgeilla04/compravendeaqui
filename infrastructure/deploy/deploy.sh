@@ -37,7 +37,11 @@ chmod 600 .env
 # Fail-closed: ningún secreto puede quedar vacío ni corto.
 for v in JWT_SECRET_KEY POSTGRES_PASSWORD MINIO_ROOT_USER MINIO_ROOT_PASSWORD S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY; do
   val=$(sed -n "s|^$v=||p" .env | tr -d '\r')
-  min=16; [ "$v" = JWT_SECRET_KEY ] && min=32
+  case "$v" in
+    JWT_SECRET_KEY) min=32 ;;                  # clave de firma
+    MINIO_ROOT_USER | S3_ACCESS_KEY_ID) min=8 ;; # nombres de usuario
+    *) min=16 ;;                               # contraseñas y claves
+  esac
   [ "${#val}" -ge "$min" ] || { echo "ERROR: el secreto $v está vacío o es demasiado corto"; exit 1; }
 done
 # La API no recibe el root de MinIO ni la contraseña de Postgres por env_file.
