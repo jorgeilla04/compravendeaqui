@@ -4,9 +4,9 @@
 	auto_https off
 	admin off
 	servers {
-		# El Caddy de entrada llega por la red de Docker: se confía en su
-		# X-Forwarded-For para conocer la IP real del visitante.
-		trusted_proxies static private_ranges
+		# Solo la red de entrada del servidor (suite-turnos_edge) puede
+		# informar la IP real del visitante vía X-Forwarded-For.
+		trusted_proxies static 172.18.0.0/16
 	}
 }
 

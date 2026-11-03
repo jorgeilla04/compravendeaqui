@@ -48,14 +48,16 @@ services:
   minio:
     <<: *restart
     # MinIO ya no publica imágenes en Docker Hub; Chainguard mantiene esta.
-    image: cgr.dev/chainguard/minio:latest
+    # Fijada por digest: actualizar a propósito, no por arrastre de "latest".
+    image: cgr.dev/chainguard/minio@sha256:32c504bea4574d8f29d719b37bc0dad920ecf3e22b81dc5cea0bb105af2ce10f
     container_name: compravendeaqui-minio
     command: ["server", "/data"]
     environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:?falta S3_ACCESS_KEY_ID}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?falta S3_SECRET_ACCESS_KEY}
-      # Alias "local" para el healthcheck con mc.
-      MC_HOST_local: http://${S3_ACCESS_KEY_ID}:${S3_SECRET_ACCESS_KEY}@localhost:9000
+      # Root de MinIO: solo para administrar (deploy.sh). La API usa un
+      # usuario propio limitado al bucket de fotos.
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?falta MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?falta MINIO_ROOT_PASSWORD}
+      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@localhost:9000
     volumes:
       - minio_data:/data
     healthcheck:
@@ -71,18 +73,20 @@ services:
       context: ./app/backend
     image: compravendeaqui-api:latest
     container_name: compravendeaqui-api
-    env_file: .env
+    # api.env = .env sin las claves root (MinIO) ni la de Postgres (la URL
+    # de la base se arma abajo). Lo genera deploy.sh.
+    env_file: api.env
     environment:
       ENVIRONMENT: production
       DEBUG: "false"
       DATABASE_URL: postgresql+psycopg://compravende:${POSTGRES_PASSWORD}@postgres:5432/compravende
       REDIS_URL: redis://redis:6379/0
       S3_ENDPOINT_URL: http://minio:9000
-      # El gateway (red interna de Docker) es el único proxy de confianza.
-      TRUSTED_PROXIES: 172.16.0.0/12
+      # Solo el gateway (IP fija en la red interna) puede informar la IP real.
+      TRUSTED_PROXIES: 172.31.250.2
+    # El bucket y su política los crea deploy.sh con el root de MinIO.
     command: >-
       sh -c "alembic upgrade head &&
-      python -m app.scripts.setup_storage &&
       uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --no-server-header"
     depends_on:
       postgres: { condition: service_healthy }
@@ -113,7 +117,10 @@ services:
     volumes:
       - ./Caddyfile.gateway:/etc/caddy/Caddyfile:ro
     depends_on: [api, web, minio]
-    networks: [interna, edge]
+    networks:
+      interna:
+        ipv4_address: 172.31.250.2
+      edge: {}
 
 volumes:
   postgres_data:
@@ -123,6 +130,9 @@ volumes:
 networks:
   interna:
     name: compravendeaqui_interna
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
   edge:
     name: suite-turnos_edge
     external: true
