@@ -127,7 +127,7 @@
 ### Seguridad/Legal
 - [x] Rate limiting activo; sanitización de inputs; prepared statements
 - [x] Teléfono no expuesto antes del clic
-- [ ] Términos y Política de Privacidad según Ley 25.326 y 24.240 publicados — _páginas publicadas; falta completar razón social/CUIT/domicilio (`components/legal/legal-page.tsx`) y revisión legal_
+- [ ] Términos y Política de Privacidad según Ley 25.326 y 24.240 publicados — _páginas publicadas con los datos del titular; falta la revisión de un abogado_
 
 ### Testing
 - [x] Unit > 80%; e2e de los 5 flujos críticos; load test 100 concurrentes — ✅ backend 93 % (86 tests); e2e 5 flujos × mobile/desktop; carga OK (ver arriba)

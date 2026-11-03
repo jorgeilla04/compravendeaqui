@@ -19,10 +19,10 @@ export function LegalPage({
   );
 }
 
-/** Datos del titular. Completar antes del lanzamiento (Ley 25.326, art. 6). */
+/** Titular del sitio y responsable de la base de datos (Ley 25.326, art. 6). */
 export const OWNER = {
-  name: "[Razón social del titular]",
-  cuit: "[CUIT]",
-  address: "[Domicilio legal], San Juan, Argentina",
-  email: "[email de contacto]",
+  name: "Jorge Aníbal Illanez",
+  cuit: "20-17223883-2",
+  address: "Monteagudo 741, San Juan, Argentina",
+  email: "illanezjorgea@gmail.com",
 };
