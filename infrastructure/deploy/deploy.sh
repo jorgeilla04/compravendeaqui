@@ -34,6 +34,12 @@ set_secret MINIO_ROOT_PASSWORD "$(openssl rand -hex 24)"
 set_secret S3_ACCESS_KEY_ID "app$(openssl rand -hex 6)"
 set_secret S3_SECRET_ACCESS_KEY "$(openssl rand -hex 24)"
 chmod 600 .env
+# Fail-closed: ningún secreto puede quedar vacío ni corto.
+for v in JWT_SECRET_KEY POSTGRES_PASSWORD MINIO_ROOT_USER MINIO_ROOT_PASSWORD S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY; do
+  val=$(sed -n "s|^$v=||p" .env | tr -d '\r')
+  min=16; [ "$v" = JWT_SECRET_KEY ] && min=32
+  [ "${#val}" -ge "$min" ] || { echo "ERROR: el secreto $v está vacío o es demasiado corto"; exit 1; }
+done
 # La API no recibe el root de MinIO ni la contraseña de Postgres por env_file.
 grep -v -E '^(MINIO_ROOT_USER|MINIO_ROOT_PASSWORD|POSTGRES_PASSWORD)=' .env > api.env
 chmod 600 api.env
@@ -57,7 +63,9 @@ mc mb --ignore-existing local/compravende-media >/dev/null
 mc anonymous set download local/compravende-media >/dev/null
 docker compose cp minio-app-policy.json minio:/tmp/policy.json >/dev/null
 mc admin policy create local compravende-app /tmp/policy.json >/dev/null
-mc admin user add local "$S3_ACCESS_KEY_ID" "$S3_SECRET_ACCESS_KEY" >/dev/null
+# El secreto viaja por variable de entorno, no como argumento (no queda en `ps`).
+docker compose exec -T -e APP_KEY="$S3_ACCESS_KEY_ID" -e APP_SECRET="$S3_SECRET_ACCESS_KEY" minio \
+  sh -c 'mc admin user add local "$APP_KEY" "$APP_SECRET"' >/dev/null
 mc admin policy attach local compravende-app --user "$S3_ACCESS_KEY_ID" >/dev/null 2>&1 || true
 echo "MinIO: bucket y usuario de la app listos."
 

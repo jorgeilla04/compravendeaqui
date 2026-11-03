@@ -126,8 +126,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _check_production_secrets(self) -> Settings:
-        if self.is_production and self.jwt_secret_key == _DEV_JWT_SECRET:
-            raise ValueError("JWT_SECRET_KEY es obligatorio en producción")
+        if self.is_production and (
+            self.jwt_secret_key == _DEV_JWT_SECRET or len(self.jwt_secret_key) < 32
+        ):
+            raise ValueError(
+                "JWT_SECRET_KEY es obligatorio en producción (mínimo 32 caracteres)"
+            )
         if self.is_production and not self.cookie_secure:
             raise ValueError("COOKIE_SECURE=true es obligatorio en producción")
         return self
