@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import ipaddress
+from functools import lru_cache
+
 from fastapi import HTTPException, Request, status
 
 from app.config import settings
@@ -29,18 +32,54 @@ def enforce(key: str, limit: int, window_seconds: int, detail: str) -> None:
         )
 
 
+@lru_cache
+def _trusted_networks(
+    entries: tuple[str, ...],
+) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+    return tuple(ipaddress.ip_network(e, strict=False) for e in entries)
+
+
+def is_trusted_proxy(peer: str | None) -> bool:
+    """IP exacta o rango CIDR de TRUSTED_PROXIES (p. ej. 172.16.0.0/12 en Docker)."""
+    if not peer:
+        return False
+    if peer in settings.trusted_proxies:
+        return True
+    try:
+        address = ipaddress.ip_address(peer)
+        networks = _trusted_networks(tuple(settings.trusted_proxies))
+    except ValueError:
+        return False
+    return any(address in network for network in networks)
+
+
 def client_ip(request: Request) -> str:
     """IP real del cliente.
 
     X-Real-IP solo se respeta si la conexión viene de un proxy de confianza
-    (TRUSTED_PROXIES, p. ej. el Nginx local); si no, cualquiera podría
-    falsificarlo para saltear los límites.
+    (TRUSTED_PROXIES); si no, cualquiera podría falsificarlo para saltear los
+    límites. Si Nginx no está en la lista, todas las requests parecen venir de
+    su IP y comparten el límite: por eso se loguea la primera vez.
     """
     peer = request.client.host if request.client else None
     forwarded = request.headers.get("x-real-ip")
-    if forwarded and peer in settings.trusted_proxies:
+    if forwarded and is_trusted_proxy(peer):
         return forwarded.strip()
+    if forwarded:
+        _warn_untrusted_proxy(peer)
     return peer or "unknown"
+
+
+@lru_cache(maxsize=32)
+def _warn_untrusted_proxy(peer: str | None) -> None:
+    from app.core.logging import get_logger
+
+    get_logger(__name__).warning(
+        "ratelimit.untrusted_proxy",
+        peer=peer,
+        hint="Llega X-Real-IP desde una IP fuera de TRUSTED_PROXIES; "
+        "agregá la IP o el rango del proxy.",
+    )
 
 
 class Lockout:

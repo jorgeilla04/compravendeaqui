@@ -161,3 +161,15 @@ def test_production_requires_secure_cookies() -> None:
         Settings(environment="production", jwt_secret_key="x" * 40, cookie_secure=False)
     with pytest.raises(ValueError, match="JWT_SECRET_KEY"):
         Settings(environment="production", cookie_secure=True)
+
+
+def test_trusted_proxy_accepts_cidr(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import settings
+    from app.core.ratelimit import is_trusted_proxy
+
+    monkeypatch.setattr(settings, "trusted_proxies", ["172.16.0.0/12", "127.0.0.1"])
+    assert is_trusted_proxy("172.18.0.5")
+    assert is_trusted_proxy("127.0.0.1")
+    assert not is_trusted_proxy("8.8.8.8")
+    assert not is_trusted_proxy("no-es-ip")
+    assert not is_trusted_proxy(None)

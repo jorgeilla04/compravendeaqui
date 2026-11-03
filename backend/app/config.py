@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     # Cookies httpOnly con los tokens (el frontend no toca los JWT).
     cookie_secure: bool = False
     cookie_domain: str | None = None
-    # IPs de los proxies (Nginx) cuyo X-Real-IP se respeta para rate limiting.
+    # IPs o rangos CIDR de los proxies (Nginx) cuyo X-Real-IP se respeta.
     trusted_proxies: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["127.0.0.1", "::1"]
     )
