@@ -37,8 +37,11 @@ services:
       DATABASE_URL: postgresql+psycopg://admin:password@postgres:5432/compravende
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: http://localhost:3000
+      # Nginx corre en la red de Docker: se confía en su X-Real-IP.
+      TRUSTED_PROXIES: 172.16.0.0/12
+    # Solo accesible desde la máquina (el tráfico público entra por Nginx).
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy

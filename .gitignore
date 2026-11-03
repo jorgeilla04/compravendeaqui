@@ -45,3 +45,10 @@ postgres_data/
 # Claude Code / Impeccable
 .claude/settings.local.json
 .claude/skills/impeccable/scripts/bin/
+
+# e2e
+e2e/.minio-data/
+frontend/.next-e2e/
+frontend/playwright-report/
+frontend/test-results/
+loadtest/results_*.csv

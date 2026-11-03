@@ -1,1 +1,1 @@
-"""Schemas Pydantic (request/response). Se completan en Fase 1."""
+"""Esquemas Pydantic (entrada/salida de la API)."""
