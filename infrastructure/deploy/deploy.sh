@@ -42,6 +42,8 @@ chmod 600 api.env
 cp app/infrastructure/deploy/compose.prod.yaml compose.yaml
 cp app/infrastructure/deploy/Caddyfile.gateway Caddyfile.gateway
 cp app/infrastructure/deploy/minio-app-policy.json minio-app-policy.json
+# No es secreto y mc corre sin root dentro del contenedor: tiene que poder leerlo.
+chmod 644 minio-app-policy.json
 mkdir -p backups && chmod 700 backups
 
 docker compose build --pull
