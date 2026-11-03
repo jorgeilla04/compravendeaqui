@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Rubik, Nunito_Sans } from "next/font/google";
+import localFont from "next/font/local";
 
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -9,18 +9,22 @@ import { SITE_URL } from "@/lib/constants";
 
 import "./globals.css";
 
-const rubik = Rubik({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+// Fuentes servidas desde el propio sitio (variables, solo latin): el build no
+// depende de Google Fonts y los visitantes no le pasan datos a terceros.
+const rubik = localFont({
+  src: "../node_modules/@fontsource-variable/rubik/files/rubik-latin-wght-normal.woff2",
+  weight: "300 900",
   variable: "--font-rubik",
   display: "swap",
+  fallback: ["system-ui", "sans-serif"],
 });
 
-const nunitoSans = Nunito_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+const nunitoSans = localFont({
+  src: "../node_modules/@fontsource-variable/nunito-sans/files/nunito-sans-latin-wght-normal.woff2",
+  weight: "200 1000",
   variable: "--font-nunito",
   display: "swap",
+  fallback: ["system-ui", "sans-serif"],
 });
 
 export const metadata: Metadata = {

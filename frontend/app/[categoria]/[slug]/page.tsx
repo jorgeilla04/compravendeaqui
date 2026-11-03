@@ -217,8 +217,20 @@ export default async function ListingPage({ params }: Props) {
         <h2 className="mb-1 text-base font-semibold text-foreground">
           Comprá con cuidado
         </h2>
-        Revisá el producto en persona antes de pagar, encontrate en un lugar
-        público y no adelantes dinero.
+        <ul className="mt-1 flex list-disc flex-col gap-1 pl-5">
+          <li>
+            Si lo ves en persona, encontrate en un lugar público y revisalo
+            antes de pagar.
+          </li>
+          <li>
+            Si te lo envían, pagá con un medio que te proteja (por ejemplo,
+            Mercado Pago) y pedí el número de seguimiento.
+          </li>
+          <li>
+            Desconfiá de precios muy por debajo del mercado, de apuros y de
+            pedidos de pago por adelantado a cuentas de terceros.
+          </li>
+        </ul>
       </aside>
     </article>
   );
