@@ -130,6 +130,9 @@ function AvatarSection({ me, onSaved }: { me: Me; onSaved: (me: Me) => void }) {
             id="avatar"
             type="file"
             accept="image/*"
+            aria-label="Elegir foto de perfil"
+            // Se abre con el botón visible: el input no suma otra parada de Tab.
+            tabIndex={-1}
             className="sr-only"
             onChange={handleFile}
             disabled={uploading}

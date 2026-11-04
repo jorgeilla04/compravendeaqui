@@ -118,7 +118,7 @@
 
 ### Diseño
 - [x] Todas las pantallas pasan `impeccable audit` con **0 findings P0/P1** — _públicas escaneadas renderizadas (0 findings); las que requieren sesión, sobre el código fuente_
-- [ ] Navegación por teclado completa; focus visible — _focus visible global, combobox de búsqueda y diálogos accesibles por teclado; falta una pasada manual completa con lector de pantalla_
+- [x] Navegación por teclado completa; focus visible — _axe-core (WCAG 2.1 AA) sin violaciones en todas las pantallas, públicas y con sesión, en mobile y desktop; e2e de recorridos solo con teclado (saltar al contenido, buscar, abrir aviso, llegar a WhatsApp, publicar, diálogos). Recomendado: una prueba real con VoiceOver antes del lanzamiento_
 
 ### SEO
 - [ ] Un aviso renderiza con SSR/ISR e incluye Schema.org válido (test con Rich Results) — _SSR/ISR + JSON-LD Product/Offer/BreadcrumbList testeados; falta pasar la URL de staging por Rich Results Test de Google_
@@ -127,7 +127,7 @@
 ### Seguridad/Legal
 - [x] Rate limiting activo; sanitización de inputs; prepared statements
 - [x] Teléfono no expuesto antes del clic
-- [ ] Términos y Política de Privacidad según Ley 25.326 y 24.240 publicados — _páginas publicadas; falta completar razón social/CUIT/domicilio (`components/legal/legal-page.tsx`) y revisión legal_
+- [ ] Términos y Política de Privacidad según Ley 25.326 y 24.240 publicados — _páginas publicadas con los datos del titular; falta la revisión de un abogado_
 
 ### Testing
 - [x] Unit > 80%; e2e de los 5 flujos críticos; load test 100 concurrentes — ✅ backend 93 % (86 tests); e2e 5 flujos × mobile/desktop; carga OK (ver arriba)

@@ -4,7 +4,11 @@ import { notFound } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { SearchResults } from "@/components/search/search-results";
-import { apiQuery, parseFilters } from "@/components/search/params";
+import {
+  apiQuery,
+  cacheSeconds,
+  parseFilters,
+} from "@/components/search/params";
 import { FormMessage } from "@/components/ui/form";
 import { serverGet } from "@/lib/api";
 import { SITE_URL } from "@/lib/constants";
@@ -45,9 +49,12 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   const filters = { ...parseFilters(searchParams), category: category.slug };
   const [page, categories] = await Promise.all([
-    serverGet<ListingPage>("/listings", apiQuery(filters), 60).catch(
-      () => null,
-    ),
+    // Caché corta y acotada (ver cacheSeconds).
+    serverGet<ListingPage>(
+      "/listings",
+      apiQuery(filters),
+      cacheSeconds(filters, { categoryVerified: true }),
+    ).catch(() => null),
     serverGet<CategoryNode[]>("/categories", undefined, 3600).catch(() => []),
   ]);
 

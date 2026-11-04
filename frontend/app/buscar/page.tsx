@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { SearchResults } from "@/components/search/search-results";
 import {
   apiQuery,
+  cacheSeconds,
   endpointFor,
   parseFilters,
 } from "@/components/search/params";
@@ -24,9 +25,12 @@ export function generateMetadata({ searchParams }: Props): Metadata {
 export default async function SearchPage({ searchParams }: Props) {
   const filters = parseFilters(searchParams);
   const [page, categories] = await Promise.all([
-    serverGet<ListingPage>(endpointFor(filters), apiQuery(filters), 30).catch(
-      () => null,
-    ),
+    // Caché corta y acotada (ver cacheSeconds): un aviso nuevo aparece enseguida.
+    serverGet<ListingPage>(
+      endpointFor(filters),
+      apiQuery(filters),
+      cacheSeconds(filters),
+    ).catch(() => null),
     serverGet<CategoryNode[]>("/categories", undefined, 3600).catch(() => []),
   ]);
 

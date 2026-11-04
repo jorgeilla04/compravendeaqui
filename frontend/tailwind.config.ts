@@ -23,6 +23,7 @@ const config: Config = {
         primary: {
           DEFAULT: "var(--color-primary)",
           foreground: "var(--color-on-primary)",
+          hover: "var(--color-primary-hover)",
         },
         secondary: {
           DEFAULT: "var(--color-secondary)",

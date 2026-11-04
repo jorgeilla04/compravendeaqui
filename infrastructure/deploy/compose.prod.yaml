@@ -1,0 +1,140 @@
+# CompraVendeAqui — producción en el VPS compartido (Contabo).
+#
+# Independiente de las otras suites del servidor: red, volúmenes, base,
+# Redis y MinIO propios. Ningún servicio publica puertos en el host.
+# El ÚNICO punto de contacto es `gateway`, que se une a la red externa
+# `suite-turnos_edge` para que el Caddy de entrada le pase el tráfico de
+# compravendeaqui.com.ar (ver Caddyfile.edge-snippet).
+#
+# deploy.sh lo copia a /opt/compravendeaqui/compose.yaml (rutas relativas a esa carpeta).
+name: compravendeaqui
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  postgres:
+    <<: *restart
+    image: postgres:16-alpine
+    container_name: compravendeaqui-postgres
+    environment:
+      POSTGRES_DB: compravende
+      POSTGRES_USER: compravende
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./app/infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compravende -d compravende"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [interna]
+
+  redis:
+    <<: *restart
+    image: redis:7-alpine
+    container_name: compravendeaqui-redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [interna]
+
+  minio:
+    <<: *restart
+    # MinIO ya no publica imágenes en Docker Hub; Chainguard mantiene esta.
+    # Fijada por digest: actualizar a propósito, no por arrastre de "latest".
+    image: cgr.dev/chainguard/minio@sha256:32c504bea4574d8f29d719b37bc0dad920ecf3e22b81dc5cea0bb105af2ce10f
+    container_name: compravendeaqui-minio
+    command: ["server", "/data"]
+    environment:
+      # Root de MinIO: solo para administrar (deploy.sh). La API usa un
+      # usuario propio limitado al bucket de fotos.
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?falta MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?falta MINIO_ROOT_PASSWORD}
+      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@localhost:9000
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [interna]
+
+  api:
+    <<: *restart
+    build:
+      context: ./app/backend
+    image: compravendeaqui-api:latest
+    container_name: compravendeaqui-api
+    # api.env = .env sin las claves root (MinIO) ni la de Postgres (la URL
+    # de la base se arma abajo). Lo genera deploy.sh.
+    env_file: api.env
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      DATABASE_URL: postgresql+psycopg://compravende:${POSTGRES_PASSWORD}@postgres:5432/compravende
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+      # Solo el gateway (IP fija en la red interna) puede informar la IP real.
+      TRUSTED_PROXIES: 172.31.250.10
+    # El bucket y su política los crea deploy.sh con el root de MinIO.
+    command: >-
+      sh -c "alembic upgrade head &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --no-server-header"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    networks: [interna]
+
+  web:
+    <<: *restart
+    build:
+      context: ./app/frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_SITE_URL}
+        NEXT_PUBLIC_SITE_URL: ${PUBLIC_SITE_URL}
+        NEXT_PUBLIC_MEDIA_URL: ${PUBLIC_SITE_URL}
+    image: compravendeaqui-web:latest
+    container_name: compravendeaqui-web
+    environment:
+      # SSR/ISR hablan con la API por la red interna.
+      API_INTERNAL_URL: http://api:8000
+    depends_on: [api]
+    networks: [interna]
+
+  gateway:
+    <<: *restart
+    image: caddy:2-alpine
+    container_name: compravendeaqui-gateway
+    volumes:
+      - ./Caddyfile.gateway:/etc/caddy/Caddyfile:ro
+    depends_on: [api, web, minio]
+    networks:
+      interna:
+        ipv4_address: 172.31.250.10
+      edge: {}
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  interna:
+    name: compravendeaqui_interna
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+          # IPs automáticas solo en la mitad alta; .10 queda fija para el gateway.
+          ip_range: 172.31.250.128/25
+  edge:
+    name: suite-turnos_edge
+    external: true

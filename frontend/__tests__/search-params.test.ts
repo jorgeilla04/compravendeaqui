@@ -1,5 +1,6 @@
 import {
   apiQuery,
+  cacheSeconds,
   endpointFor,
   parseFilters,
   toQueryString,
@@ -34,5 +35,39 @@ describe("parámetros de búsqueda", () => {
     expect(endpointFor({})).toBe("/listings");
     expect(apiQuery({ q: "auto" }).sort).toBe("relevance");
     expect(apiQuery({}).sort).toBe("newest");
+  });
+});
+
+describe("validación y caché acotada", () => {
+  it("descarta departamentos, condiciones y monedas desconocidos", () => {
+    expect(
+      parseFilters({
+        department: "Mendoza",
+        condition: "roto",
+        currency: "EUR",
+      }),
+    ).toEqual({});
+    expect(
+      parseFilters({
+        department: "Valle Fértil",
+        condition: "nuevo",
+        currency: "USD",
+      }),
+    ).toEqual({
+      department: "Valle Fértil",
+      condition: "nuevo",
+      currency: "USD",
+    });
+  });
+
+  it("solo cachea combinaciones acotadas", () => {
+    expect(cacheSeconds({ department: "Capital", sort: "newest" })).toBe(5);
+    expect(cacheSeconds({ q: "auto" })).toBe(false);
+    expect(cacheSeconds({ price_max: "1000" })).toBe(false);
+    // Rubro arbitrario desde /buscar: en vivo; verificado por la página: cacheable.
+    expect(cacheSeconds({ category: "lo-que-sea" })).toBe(false);
+    expect(
+      cacheSeconds({ category: "autos" }, { categoryVerified: true }),
+    ).toBe(5);
   });
 });

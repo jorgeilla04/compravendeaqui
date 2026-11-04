@@ -11,6 +11,8 @@
   /* Color — light */
   --color-primary: #2563eb;
   --color-on-primary: #ffffff;
+  /* Hover del primario: más oscuro para mantener AA con texto blanco (6,7:1). */
+  --color-primary-hover: #1d4ed8;
   --color-secondary: #3b82f6;
   --color-on-secondary: #ffffff;
   --color-accent: #15803d; /* #16A34A ajustado: blanco encima da 3.3:1, no pasa AA */
@@ -43,6 +45,7 @@
   :root:not([data-theme="light"]) {
     --color-primary: #3b82f6;
     --color-on-primary: #06122b;
+    --color-primary-hover: #60a5fa;
     --color-secondary: #60a5fa;
     --color-on-secondary: #06122b;
     --color-accent: #22c55e;
@@ -70,6 +73,7 @@
 :root[data-theme="dark"] {
   --color-primary: #3b82f6;
   --color-on-primary: #06122b;
+  --color-primary-hover: #60a5fa;
   --color-secondary: #60a5fa;
   --color-on-secondary: #06122b;
   --color-accent: #22c55e;

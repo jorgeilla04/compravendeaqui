@@ -1,0 +1,41 @@
+# Gateway propio de CompraVendeAqui (dentro del stack, sin HTTPS: lo hace el
+# Caddy de entrada del servidor). Reparte el tráfico del dominio.
+{
+	auto_https off
+	admin off
+	servers {
+		# Solo la red de entrada del servidor (suite-turnos_edge) puede
+		# informar la IP real del visitante vía X-Forwarded-For.
+		trusted_proxies static 172.18.0.0/16
+	}
+}
+
+:80 {
+	encode zstd gzip
+	request_body {
+		max_size 25MB
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000 {
+			header_up X-Real-IP {client_ip}
+		}
+	}
+
+	handle /health* {
+		reverse_proxy api:8000
+	}
+
+	# Fotos públicas: /media/<key> → bucket compravende-media en MinIO.
+	handle_path /media/* {
+		rewrite * /compravende-media{path}
+		reverse_proxy minio:9000 {
+			header_up Host minio:9000
+		}
+		header Cache-Control "public, max-age=31536000, immutable"
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

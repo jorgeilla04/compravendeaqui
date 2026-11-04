@@ -1,0 +1,7 @@
+# Bloque a agregar AL FINAL del Caddyfile de entrada del servidor
+# (/opt/suite-turnos/infra/caddy/Caddyfile). Es lo único que se toca fuera
+# de /opt/compravendeaqui: todo el resto del sitio vive en este stack.
+compravendeaqui.com.ar, www.compravendeaqui.com.ar {
+	encode zstd gzip
+	reverse_proxy compravendeaqui-gateway:80
+}

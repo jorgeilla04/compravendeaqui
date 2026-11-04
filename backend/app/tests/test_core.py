@@ -161,6 +161,8 @@ def test_production_requires_secure_cookies() -> None:
         Settings(environment="production", jwt_secret_key="x" * 40, cookie_secure=False)
     with pytest.raises(ValueError, match="JWT_SECRET_KEY"):
         Settings(environment="production", cookie_secure=True)
+    with pytest.raises(ValueError, match="JWT_SECRET_KEY"):
+        Settings(environment="production", cookie_secure=True, jwt_secret_key="corta")
 
 
 def test_trusted_proxy_accepts_cidr(monkeypatch: pytest.MonkeyPatch) -> None:
