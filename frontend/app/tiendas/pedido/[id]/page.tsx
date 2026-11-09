@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { PedidoEstado } from "@/components/uniformes/pedido-estado";
+import { PedidoEstado } from "@/components/tiendas/pedido-estado";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
-  title: "Tu pedido de uniformes",
+  title: "Tu pedido",
   robots: { index: false },
   referrer: "no-referrer",
 };

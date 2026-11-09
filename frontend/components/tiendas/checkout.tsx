@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
-import { PrendaIlustracion } from "@/components/uniformes/prenda-ilustracion";
+import { ProductoIlustracion } from "@/components/tiendas/producto-ilustracion";
 import { Button } from "@/components/ui/button";
 import {
   FormMessage,
@@ -16,14 +16,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { itemKey, MAX_CANTIDAD, useCart } from "@/lib/uniformes/cart";
-import { cotizar, pesosLabel } from "@/lib/uniformes/cotizar";
+import { itemKey, MAX_CANTIDAD, useCart } from "@/lib/tiendas/cart";
+import { cotizar, pesosLabel } from "@/lib/tiendas/cotizar";
 import type {
-  Envio,
+  Entrega,
   ModalidadPago,
   PedidoCreado,
-  TiendaConfig,
-} from "@/lib/uniformes/types";
+  Tienda,
+} from "@/lib/tiendas/types";
 
 export interface DatosCliente {
   nombre: string;
@@ -36,7 +36,7 @@ export interface DatosCliente {
 
 type Errors = Partial<Record<keyof DatosCliente, string>>;
 
-export function validateCliente(datos: DatosCliente): Errors {
+export function validateCliente(datos: DatosCliente, conEnvio = true): Errors {
   const errors: Errors = {};
   if (datos.nombre.trim().length < 2)
     errors.nombre = "Escribí tu nombre y apellido.";
@@ -50,11 +50,49 @@ export function validateCliente(datos: DatosCliente): Errors {
   ) {
     errors.email = "Revisá el email, parece que le falta algo.";
   }
-  if (datos.direccion.trim().length < 5) {
-    errors.direccion = "Escribí la calle, el número y alguna referencia.";
+  if (conEnvio) {
+    if (datos.direccion.trim().length < 5) {
+      errors.direccion = "Escribí la calle, el número y alguna referencia.";
+    }
+    if (!datos.departamento) errors.departamento = "Elegí el departamento.";
   }
-  if (!datos.departamento) errors.departamento = "Elegí el departamento.";
   return errors;
+}
+
+/** Textos de cada forma de entrega con la config de la tienda. */
+export function entregaTextos(
+  tienda: Tienda,
+  entrega: Entrega,
+  subtotal: number,
+): { title: string; detail: string } {
+  const t = cotizar(subtotal, entrega, "total", tienda);
+  const envio = t.envioMonto === 0 ? "sin cargo" : pesosLabel(t.envioMonto);
+  const gratisDesde =
+    tienda.envio_gratis_desde !== null && t.envioMonto > 0
+      ? ` Gratis desde ${pesosLabel(tienda.envio_gratis_desde)} en productos.`
+      : "";
+  if (entrega === "retiro") {
+    return {
+      title: "Retiro en el local · sin cargo",
+      detail: tienda.retiro_direccion ?? "",
+    };
+  }
+  if (entrega === "express") {
+    const partes = [
+      tienda.express_recargo_pct > 0
+        ? `${tienda.express_recargo_pct}% de los productos`
+        : "",
+      Number(tienda.express_monto) > 0 ? pesosLabel(tienda.express_monto) : "",
+    ].filter(Boolean);
+    return {
+      title: `Express ${tienda.express_demora} · ${pesosLabel(t.envioMonto + t.recargoExpress)}`,
+      detail: `Envío (${envio})${partes.length ? ` más ${partes.join(" y ")}` : ""}.`,
+    };
+  }
+  return {
+    title: `A domicilio ${tienda.envio_demora} · ${envio}`,
+    detail: `Llega a ${tienda.departamentos_envio.join(", ")}.${gratisDesde}`,
+  };
 }
 
 const stepper =
@@ -94,7 +132,9 @@ function Option({
       />
       <span className="flex flex-col">
         <span className="font-semibold text-foreground">{title}</span>
-        <span className="text-meta text-muted-foreground">{detail}</span>
+        {detail ? (
+          <span className="text-meta text-muted-foreground">{detail}</span>
+        ) : null}
       </span>
     </label>
   );
@@ -122,11 +162,13 @@ function Row({
   );
 }
 
-export function Checkout({ config }: { config: TiendaConfig }) {
+export function Checkout({ tienda }: { tienda: Tienda }) {
   const { items, ready, subtotal, setCantidad, remove } = useCart();
   const router = useRouter();
-  const [envio, setEnvio] = React.useState<Envio>("estandar");
-  const [modalidad, setModalidad] = React.useState<ModalidadPago>("sena");
+  const [entrega, setEntrega] = React.useState<Entrega>(tienda.entregas[0]);
+  const [modalidad, setModalidad] = React.useState<ModalidadPago>(
+    tienda.modalidades[0],
+  );
   const [datos, setDatos] = React.useState<DatosCliente>({
     nombre: "",
     telefono: "",
@@ -138,7 +180,10 @@ export function Checkout({ config }: { config: TiendaConfig }) {
   const [errors, setErrors] = React.useState<Errors>({});
   const [serverError, setServerError] = React.useState<string | null>(null);
   const [sending, setSending] = React.useState(false);
-  const t = cotizar(subtotal, envio, modalidad, config);
+  const conEnvio = entrega !== "retiro";
+  const t = cotizar(subtotal, entrega, modalidad, tienda);
+  const opcionLabel = tienda.opcion_label.toLowerCase();
+  const vendedor = tienda.vendedor_nombre.split(" ")[0];
 
   function set<K extends keyof DatosCliente>(key: K, value: string) {
     setDatos((d) => ({ ...d, [key]: value }));
@@ -146,7 +191,7 @@ export function Checkout({ config }: { config: TiendaConfig }) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const found = validateCliente(datos);
+    const found = validateCliente(datos, conEnvio);
     setErrors(found);
     setServerError(null);
     if (Object.keys(found).length > 0) {
@@ -155,24 +200,24 @@ export function Checkout({ config }: { config: TiendaConfig }) {
     }
     setSending(true);
     try {
-      const res = await api<PedidoCreado>("/uniformes/pedidos", {
+      const res = await api<PedidoCreado>(`/tiendas/${tienda.slug}/pedidos`, {
         method: "POST",
         noRefresh: true,
         body: {
           items: items.map((i) => ({
-            colegio: i.colegio,
-            prenda: i.prenda,
-            talle: i.talle,
+            grupo: i.grupo,
+            producto: i.producto,
+            opcion: i.opcion,
             cantidad: i.cantidad,
           })),
-          envio,
+          entrega,
           modalidad_pago: modalidad,
           cliente: {
             nombre: datos.nombre.trim(),
             telefono: datos.telefono.trim(),
             email: datos.email.trim() || null,
-            direccion: datos.direccion.trim(),
-            departamento: datos.departamento,
+            direccion: conEnvio ? datos.direccion.trim() : null,
+            departamento: conEnvio ? datos.departamento : null,
             notas: datos.notas.trim() || null,
           },
         },
@@ -180,7 +225,7 @@ export function Checkout({ config }: { config: TiendaConfig }) {
       if (res.init_point) {
         window.location.assign(res.init_point);
       } else {
-        router.push(`/uniformes/pedido/${res.pedido.id}`);
+        router.push(`/tiendas/pedido/${res.pedido.id}`);
       }
     } catch (err) {
       setServerError(errorMessage(err));
@@ -205,18 +250,18 @@ export function Checkout({ config }: { config: TiendaConfig }) {
           Tu carrito está vacío
         </h1>
         <p className="text-muted-foreground">
-          Elegí tu colegio y sumá las prendas que necesitás.
+          Elegí tu {tienda.grupo_label.toLowerCase()} y sumá lo que necesitás.
         </p>
         <Button asChild variant="primary" size="lg">
-          <Link href="/uniformes">Elegir colegio</Link>
+          <Link href={`/tiendas/${tienda.slug}`}>Ver el catálogo</Link>
         </Button>
       </div>
     );
   }
 
-  const payLabel = config.pagos_online
+  const payLabel = tienda.pagos_online
     ? `Pagar ${pesosLabel(t.pagadoAhora)} con Mercado Pago`
-    : `Enviar pedido a ${config.vendedora_nombre.split(" ")[0]}`;
+    : `Enviar pedido a ${vendedor}`;
 
   return (
     <form
@@ -229,23 +274,34 @@ export function Checkout({ config }: { config: TiendaConfig }) {
 
         <section aria-labelledby="items-title" className="flex flex-col gap-3">
           <h2 id="items-title" className="sr-only">
-            Prendas
+            Productos
           </h2>
           <ul className="flex flex-col gap-3">
             {items.map((item) => {
               const key = itemKey(item);
-              const name = `${item.prendaNombre} talle ${item.talle}`;
+              const name = item.opcion
+                ? `${item.productoNombre} ${opcionLabel} ${item.opcion}`
+                : item.productoNombre;
               return (
                 <li
                   key={key}
                   className="flex gap-3 rounded-card border border-border bg-card p-3"
                 >
-                  <PrendaIlustracion
-                    tipo={item.tipo}
-                    color1={item.color1}
-                    color2={item.color2}
-                    className="size-16 shrink-0 rounded-input bg-muted p-1"
-                  />
+                  {item.fotoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- miniatura del bucket
+                    <img
+                      src={item.fotoUrl}
+                      alt=""
+                      className="size-16 shrink-0 rounded-input bg-muted object-contain p-1"
+                    />
+                  ) : (
+                    <ProductoIlustracion
+                      tipo={item.tipo}
+                      color1={item.color1}
+                      color2={item.color2}
+                      className="size-16 shrink-0 rounded-input bg-muted p-1"
+                    />
+                  )}
                   <div className="flex min-w-0 flex-1 flex-col gap-2">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                       <p className="font-semibold text-foreground">{name}</p>
@@ -254,7 +310,7 @@ export function Checkout({ config }: { config: TiendaConfig }) {
                       </p>
                     </div>
                     <p className="text-meta text-muted-foreground">
-                      {item.colegioNombre} · {pesosLabel(item.precio)} c/u
+                      {item.grupoNombre} · {pesosLabel(item.precio)} c/u
                     </p>
                     <div className="flex items-center gap-2">
                       <button
@@ -298,60 +354,58 @@ export function Checkout({ config }: { config: TiendaConfig }) {
             })}
           </ul>
           <Link
-            href="/uniformes"
+            href={`/tiendas/${tienda.slug}`}
             className="self-start font-semibold text-primary underline underline-offset-4"
           >
-            Sumar prendas de otro colegio
+            Seguir comprando
           </Link>
         </section>
 
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-3 font-heading text-h2 font-semibold">
-            Envío
+            Entrega
           </legend>
-          <Option
-            name="envio"
-            value="estandar"
-            checked={envio === "estandar"}
-            onChange={() => setEnvio("estandar")}
-            title={`Estándar · ${pesosLabel(config.envio_monto)}`}
-            detail="Llega en 48 hs al Gran San Juan."
-          />
-          <Option
-            name="envio"
-            value="express"
-            checked={envio === "express"}
-            onChange={() => setEnvio("express")}
-            title={`Express 24 hs · ${pesosLabel(config.envio_monto)} + ${config.express_recargo_pct}%`}
-            detail={`Recargo del ${config.express_recargo_pct}% sobre el valor de los uniformes.`}
-          />
+          {tienda.entregas.map((e) => (
+            <Option
+              key={e}
+              name="entrega"
+              value={e}
+              checked={entrega === e}
+              onChange={() => setEntrega(e)}
+              {...entregaTextos(tienda, e, subtotal)}
+            />
+          ))}
         </fieldset>
 
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-3 font-heading text-h2 font-semibold">
             Pago
           </legend>
-          <Option
-            name="pago"
-            value="sena"
-            checked={modalidad === "sena"}
-            onChange={() => setModalidad("sena")}
-            title={`Seña · ${pesosLabel(cotizar(subtotal, envio, "sena", config).pagadoAhora)} ahora`}
-            detail={`El ${config.sena_pct}% de los uniformes más el envío. El resto lo pagás cuando lo recibís.`}
-          />
-          <Option
-            name="pago"
-            value="total"
-            checked={modalidad === "total"}
-            onChange={() => setModalidad("total")}
-            title={`Total · ${pesosLabel(cotizar(subtotal, envio, "total", config).pagadoAhora)}`}
-            detail="Pagás todo ahora y no tenés que pagar nada en la entrega."
-          />
+          {tienda.modalidades.includes("sena") ? (
+            <Option
+              name="pago"
+              value="sena"
+              checked={modalidad === "sena"}
+              onChange={() => setModalidad("sena")}
+              title={`Seña · ${pesosLabel(cotizar(subtotal, entrega, "sena", tienda).pagadoAhora)} ahora`}
+              detail={`El ${tienda.sena_pct}% de los productos${conEnvio ? " más el envío" : ""}. El resto lo pagás cuando lo recibís.`}
+            />
+          ) : null}
+          {tienda.modalidades.includes("total") ? (
+            <Option
+              name="pago"
+              value="total"
+              checked={modalidad === "total"}
+              onChange={() => setModalidad("total")}
+              title={`Total · ${pesosLabel(cotizar(subtotal, entrega, "total", tienda).pagadoAhora)}`}
+              detail="Pagás todo ahora y no tenés que pagar nada en la entrega."
+            />
+          ) : null}
         </fieldset>
 
         <fieldset className="flex flex-col gap-4">
           <legend className="mb-3 font-heading text-h2 font-semibold">
-            ¿A quién se lo llevamos?
+            {conEnvio ? "¿A quién se lo llevamos?" : "¿Quién lo retira?"}
           </legend>
           <TextField
             id="cliente-nombre"
@@ -370,7 +424,7 @@ export function Checkout({ config }: { config: TiendaConfig }) {
             inputMode="tel"
             autoComplete="tel-national"
             placeholder="264 412-3456"
-            hint={`${config.vendedora_nombre} te escribe para coordinar la entrega.`}
+            hint={`${tienda.vendedor_nombre} te escribe para coordinar la entrega.`}
             value={datos.telefono}
             onChange={(e) => set("telefono", e.target.value)}
             error={errors.telefono}
@@ -390,49 +444,52 @@ export function Checkout({ config }: { config: TiendaConfig }) {
             error={errors.email}
             disabled={sending}
           />
-          <TextField
-            id="cliente-direccion"
-            label="Dirección de entrega"
-            autoComplete="street-address"
-            placeholder="Calle, número, barrio"
-            value={datos.direccion}
-            onChange={(e) => set("direccion", e.target.value)}
-            error={errors.direccion}
-            disabled={sending}
-            required
-          />
-          <SelectField
-            id="cliente-departamento"
-            label="Departamento"
-            value={datos.departamento}
-            onChange={(e) => set("departamento", e.target.value)}
-            error={errors.departamento}
-            hint="Enviamos al Gran San Juan."
-            disabled={sending}
-            required
-          >
-            <option value="">Elegí el departamento</option>
-            {config.departamentos_envio.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </SelectField>
-          <p className="text-meta text-muted-foreground">
-            ¿Estás en otro departamento?{" "}
-            <a
-              href={config.vendedora_whatsapp_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-primary underline underline-offset-4"
-            >
-              Consultá por WhatsApp
-            </a>
-            .
-          </p>
+          {conEnvio ? (
+            <>
+              <TextField
+                id="cliente-direccion"
+                label="Dirección de entrega"
+                autoComplete="street-address"
+                placeholder="Calle, número, barrio"
+                value={datos.direccion}
+                onChange={(e) => set("direccion", e.target.value)}
+                error={errors.direccion}
+                disabled={sending}
+                required
+              />
+              <SelectField
+                id="cliente-departamento"
+                label="Departamento"
+                value={datos.departamento}
+                onChange={(e) => set("departamento", e.target.value)}
+                error={errors.departamento}
+                disabled={sending}
+                required
+              >
+                <option value="">Elegí el departamento</option>
+                {tienda.departamentos_envio.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </SelectField>
+              <p className="text-meta text-muted-foreground">
+                ¿Estás en otro departamento?{" "}
+                <a
+                  href={tienda.whatsapp_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary underline underline-offset-4"
+                >
+                  Consultá por WhatsApp
+                </a>
+                .
+              </p>
+            </>
+          ) : null}
           <TextAreaField
             id="cliente-notas"
-            label="Indicaciones para la entrega"
+            label={conEnvio ? "Indicaciones para la entrega" : "Notas"}
             optional
             rows={3}
             maxLength={500}
@@ -451,14 +508,18 @@ export function Checkout({ config }: { config: TiendaConfig }) {
           Resumen
         </h2>
         <dl className="flex flex-col gap-2 text-base text-muted-foreground">
-          <Row label="Uniformes" value={pesosLabel(t.subtotal)} />
-          {t.recargoExpress > 0 ? (
+          <Row label="Productos" value={pesosLabel(t.subtotal)} />
+          {conEnvio ? (
             <Row
-              label={`Express (+${config.express_recargo_pct}%)`}
-              value={pesosLabel(t.recargoExpress)}
+              label="Envío"
+              value={
+                t.envioMonto === 0 ? "Sin cargo" : pesosLabel(t.envioMonto)
+              }
             />
           ) : null}
-          <Row label="Envío" value={pesosLabel(t.envioMonto)} />
+          {t.recargoExpress > 0 ? (
+            <Row label="Express" value={pesosLabel(t.recargoExpress)} />
+          ) : null}
           <Row label="Total" value={pesosLabel(t.total)} strong />
           <div className="my-1 border-t border-border" />
           <Row label="Pagás ahora" value={pesosLabel(t.pagadoAhora)} strong />
@@ -473,15 +534,15 @@ export function Checkout({ config }: { config: TiendaConfig }) {
           disabled={sending}
         >
           {sending
-            ? config.pagos_online
+            ? tienda.pagos_online
               ? "Yendo a Mercado Pago…"
               : "Enviando…"
             : payLabel}
         </Button>
         <p className="text-meta text-muted-foreground">
-          {config.pagos_online
+          {tienda.pagos_online
             ? "Pagás en Mercado Pago con tarjeta, débito o dinero en cuenta."
-            : `${config.vendedora_nombre} recibe tu pedido y te escribe por WhatsApp para coordinar el pago y la entrega.`}
+            : `${tienda.vendedor_nombre} recibe tu pedido y te escribe por WhatsApp para coordinar el pago y la entrega.`}
         </p>
       </aside>
     </form>

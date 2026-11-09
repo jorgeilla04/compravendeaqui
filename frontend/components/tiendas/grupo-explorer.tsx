@@ -4,9 +4,9 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
-import { Escudo } from "@/components/uniformes/escudo";
+import { GrupoLogo } from "@/components/tiendas/grupo-logo";
 import { cn } from "@/lib/utils";
-import type { Catalogo, CategoriaSlug, Colegio } from "@/lib/uniformes/types";
+import type { Grupo, Tienda } from "@/lib/tiendas/types";
 
 /** Sin tildes ni mayúsculas: "santa lucia" encuentra "Santa Lucía". */
 export function normalize(text: string): string {
@@ -16,15 +16,15 @@ export function normalize(text: string): string {
     .toLowerCase();
 }
 
-export function filterColegios(
-  colegios: Colegio[],
+export function filterGrupos(
+  grupos: Grupo[],
   query: string,
-  categoria: CategoriaSlug | null,
-): Colegio[] {
+  categoria: string | null,
+): Grupo[] {
   const terms = normalize(query).split(/\s+/).filter(Boolean);
-  return colegios.filter((c) => {
-    if (categoria && c.categoria !== categoria) return false;
-    const haystack = normalize(`${c.nombre} ${c.departamento}`);
+  return grupos.filter((g) => {
+    if (categoria && g.categoria !== categoria) return false;
+    const haystack = normalize(`${g.nombre} ${g.subtitulo ?? ""}`);
     return terms.every((t) => haystack.includes(t));
   });
 }
@@ -32,25 +32,32 @@ export function filterColegios(
 const chip =
   "inline-flex min-h-11 shrink-0 items-center rounded-pill border px-4 text-base transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-export function ColegioExplorer({ catalogo }: { catalogo: Catalogo }) {
+export function GrupoExplorer({ tienda }: { tienda: Tienda }) {
   const [query, setQuery] = React.useState("");
-  const [categoria, setCategoria] = React.useState<CategoriaSlug | null>(null);
-  const found = filterColegios(catalogo.colegios, query, categoria);
-  const groups = catalogo.categorias
-    .map((cat) => ({
-      ...cat,
-      colegios: found.filter((c) => c.categoria === cat.slug),
-    }))
-    .filter((g) => g.colegios.length > 0);
+  const [categoria, setCategoria] = React.useState<string | null>(null);
+  const label = tienda.grupo_label.toLowerCase();
+  const found = filterGrupos(tienda.grupos, query, categoria);
+  const usadas = tienda.categorias.filter((c) =>
+    tienda.grupos.some((g) => g.categoria === c),
+  );
+  const sinCategoria = found.filter(
+    (g) => !g.categoria || !usadas.includes(g.categoria),
+  );
+  const groups = [
+    ...usadas.map((nombre) => ({
+      nombre,
+      grupos: found.filter((g) => g.categoria === nombre),
+    })),
+    ...(sinCategoria.length
+      ? [{ nombre: usadas.length ? "Otros" : "", grupos: sinCategoria }]
+      : []),
+  ].filter((g) => g.grupos.length > 0);
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
-        <label
-          htmlFor="buscar-colegio"
-          className="font-semibold text-foreground"
-        >
-          Buscá tu colegio
+        <label htmlFor="buscar-grupo" className="font-semibold text-foreground">
+          Buscá tu {label}
         </label>
         <div className="relative max-w-xl">
           <Search
@@ -58,29 +65,29 @@ export function ColegioExplorer({ catalogo }: { catalogo: Catalogo }) {
             className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
           />
           <input
-            id="buscar-colegio"
+            id="buscar-grupo"
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Nombre o departamento"
+            placeholder="Escribí el nombre"
             autoComplete="off"
             className="h-12 w-full rounded-input border border-border bg-card pl-10 pr-3 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
-        <div
-          role="group"
-          aria-label="Filtrar por tipo de colegio"
-          className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
-        >
-          {[{ slug: null, nombre: "Todos" }, ...catalogo.categorias].map(
-            (cat) => {
-              const active = categoria === cat.slug;
+        {usadas.length > 1 ? (
+          <div
+            role="group"
+            aria-label="Filtrar por categoría"
+            className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+          >
+            {[null, ...usadas].map((cat) => {
+              const active = categoria === cat;
               return (
                 <button
-                  key={cat.slug ?? "todos"}
+                  key={cat ?? "todas"}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => setCategoria(cat.slug as CategoriaSlug | null)}
+                  onClick={() => setCategoria(cat)}
                   className={cn(
                     chip,
                     "snap-start",
@@ -89,29 +96,29 @@ export function ColegioExplorer({ catalogo }: { catalogo: Catalogo }) {
                       : "border-border bg-card text-foreground hover:border-primary",
                   )}
                 >
-                  {cat.nombre}
+                  {cat ?? "Todos"}
                 </button>
               );
-            },
-          )}
-        </div>
+            })}
+          </div>
+        ) : null}
       </div>
 
       <p className="sr-only" aria-live="polite">
-        {found.length === 1 ? "1 colegio" : `${found.length} colegios`}
+        {found.length === 1 ? `1 resultado` : `${found.length} resultados`}
       </p>
 
-      {catalogo.colegios.length === 0 ? (
+      {tienda.grupos.length === 0 ? (
         <div className="flex max-w-prose flex-col gap-3 rounded-card border border-border bg-card p-6">
           <h2 className="font-heading text-h2 font-semibold">
-            Estamos cargando los colegios
+            Estamos cargando el catálogo
           </h2>
           <p className="text-muted-foreground">
-            En unos días vas a poder elegir el uniforme de tu colegio acá. Si lo
-            necesitás ya, escribile a {catalogo.config.vendedora_nombre}.
+            En unos días vas a poder comprar acá. Si lo necesitás ya, escribile
+            a {tienda.vendedor_nombre}.
           </p>
           <a
-            href={catalogo.config.vendedora_whatsapp_url}
+            href={tienda.whatsapp_url}
             target="_blank"
             rel="noopener noreferrer"
             className="font-semibold text-primary underline underline-offset-4"
@@ -121,10 +128,10 @@ export function ColegioExplorer({ catalogo }: { catalogo: Catalogo }) {
         </div>
       ) : groups.length === 0 ? (
         <p className="text-muted-foreground">
-          No encontramos colegios con “{query}”. Probá con otra palabra o
-          escribile a {catalogo.config.vendedora_nombre}{" "}
+          No encontramos “{query}”. Probá con otra palabra o escribile a{" "}
+          {tienda.vendedor_nombre}{" "}
           <a
-            href={catalogo.config.vendedora_whatsapp_url}
+            href={tienda.whatsapp_url}
             target="_blank"
             rel="noopener noreferrer"
             className="font-semibold text-primary underline underline-offset-4"
@@ -136,31 +143,32 @@ export function ColegioExplorer({ catalogo }: { catalogo: Catalogo }) {
       ) : (
         groups.map((group) => (
           <section
-            key={group.slug}
-            aria-labelledby={`cat-${group.slug}`}
+            key={group.nombre || "todos"}
+            aria-label={group.nombre || tienda.grupo_label}
             className="flex flex-col gap-3"
           >
-            <h2
-              id={`cat-${group.slug}`}
-              className="font-heading text-h2 font-semibold"
-            >
-              {group.nombre}
-            </h2>
+            {group.nombre ? (
+              <h2 className="font-heading text-h2 font-semibold">
+                {group.nombre}
+              </h2>
+            ) : null}
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {group.colegios.map((colegio) => (
-                <li key={colegio.slug}>
+              {group.grupos.map((grupo) => (
+                <li key={grupo.slug}>
                   <Link
-                    href={`/uniformes/${colegio.slug}`}
+                    href={`/tiendas/${tienda.slug}/${grupo.slug}`}
                     className="flex min-h-20 items-center gap-3 rounded-card border border-border bg-card p-3 transition-colors duration-200 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <Escudo colegio={colegio} />
+                    <GrupoLogo grupo={grupo} />
                     <span className="flex min-w-0 flex-col">
                       <span className="font-semibold text-foreground">
-                        {colegio.nombre}
+                        {grupo.nombre}
                       </span>
-                      <span className="text-meta text-muted-foreground">
-                        {colegio.departamento}
-                      </span>
+                      {grupo.subtitulo ? (
+                        <span className="text-meta text-muted-foreground">
+                          {grupo.subtitulo}
+                        </span>
+                      ) : null}
                     </span>
                     <span
                       aria-hidden="true"
@@ -168,11 +176,11 @@ export function ColegioExplorer({ catalogo }: { catalogo: Catalogo }) {
                     >
                       <span
                         className="size-5 rounded-full border border-border"
-                        style={{ background: colegio.color1 }}
+                        style={{ background: grupo.color1 }}
                       />
                       <span
                         className="size-5 rounded-full border border-border"
-                        style={{ background: colegio.color2 }}
+                        style={{ background: grupo.color2 }}
                       />
                     </span>
                   </Link>

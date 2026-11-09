@@ -2,33 +2,29 @@
 
 import * as React from "react";
 
-import { Escudo } from "@/components/uniformes/escudo";
+import { GrupoLogo } from "@/components/tiendas/grupo-logo";
 import { Button } from "@/components/ui/button";
 import { FormMessage, SelectField, TextField } from "@/components/ui/form";
 import { api, errorMessage } from "@/lib/api";
-import type { CategoriaSlug, ColegioAdmin } from "@/lib/uniformes/types";
-
-export const CATEGORIAS: { slug: CategoriaSlug; nombre: string }[] = [
-  { slug: "parroquiales", nombre: "Parroquiales y confesionales" },
-  { slug: "privados", nombre: "Privados laicos y bilingües" },
-  { slug: "preuniversitarios", nombre: "Preuniversitarios (UNSJ)" },
-];
+import type { GrupoAdmin, TiendaAdmin } from "@/lib/tiendas/types";
 
 interface Draft {
   nombre: string;
-  departamento: string;
-  categoria: CategoriaSlug;
+  subtitulo: string;
+  categoria: string;
   color1: string;
   color2: string;
   activo: boolean;
 }
 
-function ColegioForm({
+function GrupoForm({
+  tienda,
   initial,
   submitLabel,
   onSubmit,
   idPrefix,
 }: {
+  tienda: TiendaAdmin;
   initial: Draft;
   submitLabel: string;
   onSubmit: (draft: Draft) => Promise<void>;
@@ -47,24 +43,14 @@ function ColegioForm({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (
-      draft.nombre.trim().length < 3 ||
-      draft.departamento.trim().length < 2
-    ) {
-      setMessage({
-        tone: "error",
-        text: "Completá el nombre y el departamento.",
-      });
+    if (draft.nombre.trim().length < 2) {
+      setMessage({ tone: "error", text: "Completá el nombre." });
       return;
     }
     setSaving(true);
     setMessage(null);
     try {
-      await onSubmit({
-        ...draft,
-        nombre: draft.nombre.trim(),
-        departamento: draft.departamento.trim(),
-      });
+      await onSubmit({ ...draft, nombre: draft.nombre.trim() });
       setMessage({ tone: "success", text: "Guardado." });
     } catch (err) {
       setMessage({ tone: "error", text: errorMessage(err) });
@@ -81,33 +67,37 @@ function ColegioForm({
     >
       <TextField
         id={`${idPrefix}-nombre`}
-        label="Nombre del colegio"
+        label="Nombre"
         value={draft.nombre}
         onChange={(e) => set("nombre", e.target.value)}
         disabled={saving}
         required
       />
       <TextField
-        id={`${idPrefix}-departamento`}
-        label="Departamento"
-        value={draft.departamento}
-        onChange={(e) => set("departamento", e.target.value)}
+        id={`${idPrefix}-subtitulo`}
+        label="Detalle"
+        optional
+        hint="Ej.: el departamento."
+        value={draft.subtitulo}
+        onChange={(e) => set("subtitulo", e.target.value)}
         disabled={saving}
-        required
       />
-      <SelectField
-        id={`${idPrefix}-categoria`}
-        label="Categoría"
-        value={draft.categoria}
-        onChange={(e) => set("categoria", e.target.value as CategoriaSlug)}
-        disabled={saving}
-      >
-        {CATEGORIAS.map((c) => (
-          <option key={c.slug} value={c.slug}>
-            {c.nombre}
-          </option>
-        ))}
-      </SelectField>
+      {tienda.categorias.length > 0 ? (
+        <SelectField
+          id={`${idPrefix}-categoria`}
+          label="Categoría"
+          value={draft.categoria}
+          onChange={(e) => set("categoria", e.target.value)}
+          disabled={saving}
+        >
+          <option value="">Sin categoría</option>
+          {tienda.categorias.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
       <div className="flex gap-3">
         {(["color1", "color2"] as const).map((key, i) => (
           <label
@@ -154,19 +144,21 @@ function ColegioForm({
 }
 
 function LogoUpload({
-  colegio,
+  slug,
+  grupo,
   onUploaded,
 }: {
-  colegio: ColegioAdmin;
-  onUploaded: (c: ColegioAdmin) => void;
+  slug: string;
+  grupo: GrupoAdmin;
+  onUploaded: (g: GrupoAdmin) => void;
 }) {
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
-  const id = `logo-${colegio.slug}`;
+  const id = `logo-${grupo.slug}`;
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-meta font-semibold">
-        Escudo oficial (con autorización del colegio)
+        Logo o escudo oficial (con autorización)
       </label>
       <input
         id={id}
@@ -184,12 +176,9 @@ function LogoUpload({
           form.append("file", file, file.name);
           try {
             onUploaded(
-              await api<ColegioAdmin>(
-                `/admin/uniformes/colegios/${colegio.slug}/logo`,
-                {
-                  method: "POST",
-                  body: form,
-                },
+              await api<GrupoAdmin>(
+                `/admin/tiendas/${slug}/grupos/${grupo.slug}/logo`,
+                { method: "POST", body: form },
               ),
             );
           } catch (err) {
@@ -204,95 +193,105 @@ function LogoUpload({
   );
 }
 
-export function ColegiosAdmin({
-  colegios,
+export function GruposAdmin({
+  tienda,
+  grupos,
   onChange,
 }: {
-  colegios: ColegioAdmin[];
-  onChange: (colegios: ColegioAdmin[]) => void;
+  tienda: TiendaAdmin;
+  grupos: GrupoAdmin[];
+  onChange: (grupos: GrupoAdmin[]) => void;
 }) {
   const [formKey, setFormKey] = React.useState(0);
-  const replace = (updated: ColegioAdmin) =>
-    onChange(colegios.map((c) => (c.slug === updated.slug ? updated : c)));
+  const label = tienda.grupo_label.toLowerCase();
+  const replace = (updated: GrupoAdmin) =>
+    onChange(grupos.map((g) => (g.slug === updated.slug ? updated : g)));
+  const toBody = (d: Draft) => ({
+    ...d,
+    subtitulo: d.subtitulo.trim() || null,
+    categoria: d.categoria || null,
+  });
 
   return (
     <div className="flex flex-col gap-8">
       <section
-        aria-labelledby="nuevo-colegio"
+        aria-labelledby="nuevo-grupo"
         className="flex flex-col gap-3 rounded-card border border-border bg-card p-4"
       >
-        <h3 id="nuevo-colegio" className="font-heading text-h3 font-semibold">
-          Agregar colegio
+        <h3 id="nuevo-grupo" className="font-heading text-h3 font-semibold">
+          Agregar {label}
         </h3>
-        <ColegioForm
+        <GrupoForm
           key={formKey}
+          tienda={tienda}
           idPrefix="nuevo"
-          submitLabel="Agregar colegio"
+          submitLabel={`Agregar ${label}`}
           initial={{
             nombre: "",
-            departamento: "Capital",
-            categoria: "parroquiales",
+            subtitulo: "",
+            categoria: "",
             color1: "#1E3A8A",
             color2: "#FFFFFF",
             activo: true,
           }}
           onSubmit={async (draft) => {
-            const created = await api<ColegioAdmin>(
-              "/admin/uniformes/colegios",
-              {
-                method: "POST",
-                body: draft,
-              },
+            const created = await api<GrupoAdmin>(
+              `/admin/tiendas/${tienda.slug}/grupos`,
+              { method: "POST", body: toBody(draft) },
             );
-            onChange([...colegios, created]);
+            onChange([...grupos, created]);
             setFormKey((k) => k + 1);
           }}
         />
       </section>
 
-      <section aria-labelledby="lista-colegios" className="flex flex-col gap-3">
-        <h3 id="lista-colegios" className="font-heading text-h3 font-semibold">
-          {colegios.length} {colegios.length === 1 ? "colegio" : "colegios"}
+      <section aria-labelledby="lista-grupos" className="flex flex-col gap-3">
+        <h3 id="lista-grupos" className="font-heading text-h3 font-semibold">
+          {grupos.length} {grupos.length === 1 ? label : `${label}s`}
         </h3>
         <ul className="flex flex-col gap-3">
-          {colegios.map((colegio) => (
-            <li key={colegio.slug}>
+          {grupos.map((grupo) => (
+            <li key={grupo.slug}>
               <details className="rounded-card border border-border bg-card">
                 <summary className="flex min-h-14 cursor-pointer items-center gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Escudo colegio={colegio} size="sm" />
+                  <GrupoLogo grupo={grupo} size="sm" />
                   <span className="flex flex-col">
-                    <span className="font-semibold">{colegio.nombre}</span>
+                    <span className="font-semibold">{grupo.nombre}</span>
                     <span className="text-meta text-muted-foreground">
-                      {colegio.departamento}
-                      {colegio.activo ? "" : " · Oculto"}
+                      {[grupo.subtitulo, grupo.categoria]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      {grupo.activo ? "" : " · Oculto"}
                     </span>
                   </span>
                 </summary>
                 <div className="flex flex-col gap-4 border-t border-border p-3">
-                  <ColegioForm
-                    idPrefix={colegio.slug}
+                  <GrupoForm
+                    tienda={tienda}
+                    idPrefix={grupo.slug}
                     submitLabel="Guardar cambios"
                     initial={{
-                      nombre: colegio.nombre,
-                      departamento: colegio.departamento,
-                      categoria: colegio.categoria,
-                      color1: colegio.color1,
-                      color2: colegio.color2,
-                      activo: colegio.activo,
+                      nombre: grupo.nombre,
+                      subtitulo: grupo.subtitulo ?? "",
+                      categoria: grupo.categoria ?? "",
+                      color1: grupo.color1,
+                      color2: grupo.color2,
+                      activo: grupo.activo,
                     }}
                     onSubmit={async (draft) =>
                       replace(
-                        await api<ColegioAdmin>(
-                          `/admin/uniformes/colegios/${colegio.slug}`,
-                          {
-                            method: "PUT",
-                            body: draft,
-                          },
+                        await api<GrupoAdmin>(
+                          `/admin/tiendas/${tienda.slug}/grupos/${grupo.slug}`,
+                          { method: "PUT", body: toBody(draft) },
                         ),
                       )
                     }
                   />
-                  <LogoUpload colegio={colegio} onUploaded={replace} />
+                  <LogoUpload
+                    slug={tienda.slug}
+                    grupo={grupo}
+                    onUploaded={replace}
+                  />
                 </div>
               </details>
             </li>

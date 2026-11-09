@@ -53,7 +53,7 @@ export default async function HomePage() {
           </p>
         </div>
         <Button asChild variant="primary" size="lg" className="shrink-0">
-          <Link href="/uniformes">Elegir colegio</Link>
+          <Link href="/tiendas/uniformes">Elegir colegio</Link>
         </Button>
       </section>
 

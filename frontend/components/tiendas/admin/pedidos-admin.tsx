@@ -8,19 +8,21 @@ import { FormMessage, SelectField } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, errorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import { pesosLabel } from "@/lib/uniformes/cotizar";
+import { pesosLabel } from "@/lib/tiendas/cotizar";
 import {
   ESTADO_LABEL,
   type EstadoPedido,
   type PedidoAdmin,
-} from "@/lib/uniformes/types";
+} from "@/lib/tiendas/types";
 
 const ESTADOS = Object.keys(ESTADO_LABEL) as EstadoPedido[];
 
 function PedidoRow({
+  slug,
   pedido,
   onChange,
 }: {
+  slug: string;
   pedido: PedidoAdmin;
   onChange: (p: PedidoAdmin) => void;
 }) {
@@ -33,7 +35,7 @@ function PedidoRow({
     setError(null);
     try {
       onChange(
-        await api<PedidoAdmin>(`/admin/uniformes/pedidos/${pedido.id}`, {
+        await api<PedidoAdmin>(`/admin/tiendas/${slug}/pedidos/${pedido.id}`, {
           method: "PUT",
           body: { estado },
         }),
@@ -56,16 +58,18 @@ function PedidoRow({
         </Badge>
       </div>
       <p className="text-meta text-muted-foreground">
-        {formatDate(pedido.created_at)} ·{" "}
-        {pedido.envio === "express" ? "Express 24 hs" : "Estándar 48 hs"} ·{" "}
+        {formatDate(pedido.created_at)} · {pedido.entrega_label} ·{" "}
         {pedido.modalidad_pago === "sena" ? "Seña" : "Pago total"}
         {pedido.mp_payment_id ? ` · MP N° ${pedido.mp_payment_id}` : ""}
       </p>
       <ul className="text-base">
         {pedido.items.map((item, i) => (
           <li key={i}>
-            {item.cantidad} × {item.prenda_nombre} talle {item.talle} —{" "}
-            {item.colegio_nombre}
+            {item.cantidad} × {item.producto_nombre}
+            {item.opcion
+              ? ` ${pedido.opcion_label.toLowerCase()} ${item.opcion}`
+              : ""}{" "}
+            — {item.grupo_nombre}
           </li>
         ))}
       </ul>
@@ -73,7 +77,9 @@ function PedidoRow({
         <div>
           <dt className="inline font-semibold">Entrega: </dt>
           <dd className="inline">
-            {pedido.direccion}, {pedido.departamento}
+            {pedido.direccion
+              ? `${pedido.direccion}, ${pedido.departamento}`
+              : "Retira en el local"}
           </dd>
         </div>
         <div>
@@ -140,19 +146,19 @@ function PedidoRow({
   );
 }
 
-export function PedidosAdmin() {
+export function PedidosAdmin({ slug }: { slug: string }) {
   const [filtro, setFiltro] = React.useState<EstadoPedido | "">("");
   const [pedidos, setPedidos] = React.useState<PedidoAdmin[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setPedidos(null);
-    api<PedidoAdmin[]>(
-      `/admin/uniformes/pedidos${filtro ? `?estado=${filtro}` : ""}`,
-    )
+    api<PedidoAdmin[]>(`/admin/tiendas/${slug}/pedidos`, {
+      query: { estado: filtro || undefined },
+    })
       .then(setPedidos)
       .catch((err) => setError(errorMessage(err)));
-  }, [filtro]);
+  }, [filtro, slug]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -180,6 +186,7 @@ export function PedidosAdmin() {
           {pedidos?.map((p) => (
             <PedidoRow
               key={p.id}
+              slug={slug}
               pedido={p}
               onChange={(updated) =>
                 setPedidos(

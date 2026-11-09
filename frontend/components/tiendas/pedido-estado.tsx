@@ -9,11 +9,14 @@ import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError, errorMessage } from "@/lib/api";
-import { useCart } from "@/lib/uniformes/cart";
-import { pesosLabel } from "@/lib/uniformes/cotizar";
-import { ESTADO_LABEL, type Pedido } from "@/lib/uniformes/types";
+import { cartStorageKey } from "@/lib/tiendas/cart";
+import { pesosLabel } from "@/lib/tiendas/cotizar";
+import { ESTADO_LABEL, type Pedido } from "@/lib/tiendas/types";
 
 export const POLL_MS = 4000;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const NOT_FOUND = "No encontramos ese pedido. Revisá el link.";
 const MAX_POLLS = 15;
 
 export function PedidoEstado({ id }: { id: string }) {
@@ -21,24 +24,30 @@ export function PedidoEstado({ id }: { id: string }) {
   // Mercado Pago vuelve con payment_id (o collection_id en integraciones viejas).
   const paymentId =
     searchParams.get("payment_id") ?? searchParams.get("collection_id");
-  const { clear, ready } = useCart();
   const [pedido, setPedido] = React.useState<Pedido | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const polls = React.useRef(0);
 
   const load = React.useCallback(async () => {
+    // El id viene de la URL: solo un UUID llega a la API (nada de "../").
+    if (!UUID_RE.test(id)) {
+      setError(NOT_FOUND);
+      return;
+    }
     try {
-      const query =
-        paymentId && /^\d+$/.test(paymentId) ? `?payment_id=${paymentId}` : "";
       setPedido(
-        await api<Pedido>(`/uniformes/pedidos/${id}${query}`, {
+        await api<Pedido>(`/tiendas/pedidos/${encodeURIComponent(id)}`, {
           noRefresh: true,
+          query:
+            paymentId && /^\d+$/.test(paymentId)
+              ? { payment_id: paymentId }
+              : undefined,
         }),
       );
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 404
-          ? "No encontramos ese pedido. Revisá el link."
+          ? NOT_FOUND
           : errorMessage(err),
       );
     }
@@ -59,13 +68,16 @@ export function PedidoEstado({ id }: { id: string }) {
     return () => window.clearTimeout(timer);
   }, [pedido, paymentId, load]);
 
-  // El pedido ya está en manos de la vendedora: se vacía el carrito.
+  // El pedido ya está en manos del dueño de la tienda: se vacía ese carrito.
   React.useEffect(() => {
-    if (ready && pedido && ["pagado", "a_coordinar"].includes(pedido.estado)) {
-      clear();
+    if (pedido && ["pagado", "a_coordinar"].includes(pedido.estado)) {
+      try {
+        window.localStorage.setItem(cartStorageKey(pedido.tienda.slug), "[]");
+      } catch {
+        /* sin storage: no hay carrito guardado */
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar el estado
-  }, [ready, pedido?.estado]);
+  }, [pedido]);
 
   if (error) return <FormMessage>{error}</FormMessage>;
   if (!pedido) {
@@ -85,7 +97,7 @@ export function PedidoEstado({ id }: { id: string }) {
       title: "¡Listo! Recibimos tu pago",
       text:
         pedido.modalidad_pago === "sena"
-          ? `Pagaste la seña de ${pesosLabel(pedido.pagado_ahora)}. El resto, ${pesosLabel(pedido.saldo)}, lo pagás cuando lo recibís.`
+          ? `Pagaste la seña de ${pesosLabel(pedido.pagado_ahora)}. El resto, ${pesosLabel(pedido.saldo)}, lo pagás en la entrega.`
           : `Pagaste ${pesosLabel(pedido.pagado_ahora)}. No tenés que pagar nada en la entrega.`,
     },
     a_coordinar: {
@@ -162,16 +174,19 @@ export function PedidoEstado({ id }: { id: string }) {
           Pedido {pedido.codigo}
         </h2>
         <p className="text-meta text-muted-foreground">
-          Estado: {ESTADO_LABEL[pedido.estado]} · Envío{" "}
-          {pedido.envio === "express" ? "express 24 hs" : "estándar 48 hs"}
+          {pedido.tienda.nombre} · {ESTADO_LABEL[pedido.estado]} ·{" "}
+          {pedido.entrega_label}
         </p>
         <ul className="flex flex-col gap-1">
           {pedido.items.map((item, i) => (
             <li key={i} className="flex justify-between gap-4">
               <span>
-                {item.cantidad} × {item.prenda_nombre} talle {item.talle}
+                {item.cantidad} × {item.producto_nombre}
+                {item.opcion
+                  ? ` ${pedido.opcion_label.toLowerCase()} ${item.opcion}`
+                  : ""}
                 <span className="block text-meta text-muted-foreground">
-                  {item.colegio_nombre}
+                  {item.grupo_nombre}
                 </span>
               </span>
               <span>
@@ -196,7 +211,7 @@ export function PedidoEstado({ id }: { id: string }) {
         </dl>
       </section>
       <Link
-        href="/uniformes"
+        href={`/tiendas/${pedido.tienda.slug}`}
         className="self-start font-semibold text-primary underline underline-offset-4"
       >
         Volver a la tienda

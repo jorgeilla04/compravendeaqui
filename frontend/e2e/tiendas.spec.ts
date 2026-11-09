@@ -4,7 +4,7 @@ const FAKE_SMTP = process.env.E2E_FAKE_SMTP_URL ?? "http://localhost:9997";
 const VENDEDORA = "virginialauratello@gmail.com";
 
 async function armarCarrito(page: Page) {
-  await page.goto("/uniformes");
+  await page.goto("/tiendas/uniformes");
   await page.getByLabel("Buscá tu colegio").fill("santa rosa");
   await page.getByRole("link", { name: /Colegio Santa Rosa de Lima/ }).click();
   await expect(
@@ -24,8 +24,20 @@ async function armarCarrito(page: Page) {
   });
   await corbata.getByRole("button", { name: "Agregar al carrito" }).click();
   await expect(
-    page.getByRole("link", { name: "Ver carrito, 3 prendas" }),
+    page.getByRole("link", { name: "Ver carrito, 3 productos" }),
   ).toBeVisible();
+}
+
+/** Productos distintos guardados en el carrito de la tienda de uniformes. */
+async function carrito(page: Page): Promise<number> {
+  return page.evaluate(
+    () =>
+      (
+        JSON.parse(
+          localStorage.getItem("cva-carrito-uniformes") ?? "[]",
+        ) as unknown[]
+      ).length,
+  );
 }
 
 async function completarDatos(page: Page) {
@@ -35,12 +47,12 @@ async function completarDatos(page: Page) {
   await page.getByLabel("Departamento").selectOption("Rawson");
 }
 
-test.describe("Tienda de uniformes", () => {
+test.describe("Tiendas: uniformes escolares", () => {
   test("comprar con seña y Mercado Pago, y avisar a la vendedora", async ({
     page,
   }) => {
     await armarCarrito(page);
-    await page.getByRole("link", { name: "Ver carrito, 3 prendas" }).click();
+    await page.getByRole("link", { name: "Ver carrito, 3 productos" }).click();
     const resumen = page.getByRole("complementary", { name: "Resumen" });
     await expect(resumen.getByText("$ 35.000")).toBeVisible(); // 30.000 + envío
     await completarDatos(page);
@@ -55,13 +67,13 @@ test.describe("Tienda de uniformes", () => {
     await expect(page.getByText("Monto: 8000")).toBeVisible();
     await page.getByRole("button", { name: "Pagar" }).click();
 
-    await expect(page).toHaveURL(/\/uniformes\/pedido\/[\w-]+\?payment_id=\d+/);
+    await expect(page).toHaveURL(/\/tiendas\/pedido\/[\w-]+\?payment_id=\d+/);
     await expect(
       page.getByRole("heading", { name: "¡Listo! Recibimos tu pago" }),
     ).toBeVisible();
     await expect(page.getByText(/Pagaste la seña de \$ 8.000/)).toBeVisible();
-    // El carrito queda vacío.
-    await expect(page.getByRole("link", { name: "Ver carrito" })).toBeVisible();
+    // El carrito de la tienda queda vacío.
+    await expect.poll(() => carrito(page)).toBe(0);
 
     // A la vendedora le llega el detalle por mail.
     await expect
@@ -76,7 +88,7 @@ test.describe("Tienda de uniformes", () => {
 
   test("si el pago se rechaza se puede probar de nuevo", async ({ page }) => {
     await armarCarrito(page);
-    await page.goto("/uniformes/carrito");
+    await page.goto("/tiendas/uniformes/carrito");
     await page.getByRole("radio", { name: /Express 24 hs/ }).check();
     await page.getByRole("radio", { name: /^Total/ }).check();
     await completarDatos(page);
@@ -89,9 +101,7 @@ test.describe("Tienda de uniformes", () => {
       page.getByRole("heading", { name: "El pago no se aprobó" }),
     ).toBeVisible();
     // El carrito sigue armado por si quiere cambiar algo.
-    await expect(
-      page.getByRole("link", { name: "Ver carrito, 3 prendas" }),
-    ).toBeVisible();
+    expect(await carrito(page)).toBe(2);
     await page.getByRole("link", { name: "Probar de nuevo" }).click();
     await page.getByRole("button", { name: "Pagar" }).click();
     await expect(
@@ -101,4 +111,14 @@ test.describe("Tienda de uniformes", () => {
       page.getByText("No tenés que pagar nada en la entrega."),
     ).toBeVisible();
   });
+});
+
+test("la dirección vieja /uniformes lleva a la tienda", async ({ page }) => {
+  await page.goto("/uniformes");
+  await expect(page).toHaveURL(/\/tiendas\/uniformes$/);
+  await page.goto("/tiendas");
+  await page.getByRole("link", { name: /Uniformes escolares/ }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Uniformes escolares" }),
+  ).toBeVisible();
 });

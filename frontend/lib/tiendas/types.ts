@@ -1,7 +1,6 @@
-/** Tipos de la tienda de uniformes (espejo de app/schemas/uniformes.py). */
+/** Tipos de las tiendas virtuales (espejo de app/schemas/tiendas.py). */
 
-export type CategoriaSlug = "parroquiales" | "privados" | "preuniversitarios";
-export type Envio = "estandar" | "express";
+export type Entrega = "estandar" | "express" | "retiro";
 export type ModalidadPago = "sena" | "total";
 export type EstadoPedido =
   | "pendiente_pago"
@@ -12,55 +11,65 @@ export type EstadoPedido =
   | "entregado"
   | "cancelado";
 
-export interface Categoria {
-  slug: CategoriaSlug;
-  nombre: string;
-}
-
-export interface Colegio {
+export interface TiendaResumen {
   slug: string;
   nombre: string;
-  departamento: string;
-  categoria: CategoriaSlug;
+  descripcion: string | null;
+}
+
+export interface Grupo {
+  slug: string;
+  nombre: string;
+  subtitulo: string | null;
+  categoria: string | null;
   color1: string;
   color2: string;
   logo_url: string | null;
 }
 
-export interface Prenda {
+/** Config de cobro y entrega de la tienda (la usan el carrito y la cotización). */
+export interface TiendaReglas {
+  entregas: Entrega[];
+  modalidades: ModalidadPago[];
+  envio_monto: string;
+  envio_gratis_desde: string | null;
+  envio_demora: string;
+  departamentos_envio: string[];
+  express_recargo_pct: number;
+  express_monto: string;
+  express_demora: string;
+  retiro_direccion: string | null;
+  sena_pct: number;
+}
+
+export interface Tienda extends TiendaResumen, TiendaReglas {
+  grupo_label: string;
+  opcion_label: string;
+  categorias: string[];
+  vendedor_nombre: string;
+  whatsapp_url: string;
+  pagos_online: boolean;
+  grupos: Grupo[];
+}
+
+export interface Producto {
   slug: string;
   nombre: string;
+  descripcion: string | null;
   tipo: string;
   precio: string;
-  talles: string[];
+  opciones: string[];
   foto_url: string | null;
 }
 
-export interface ColegioDetalle extends Colegio {
-  prendas: Prenda[];
-}
-
-export interface TiendaConfig {
-  envio_monto: number;
-  express_recargo_pct: number;
-  sena_pct: number;
-  departamentos_envio: string[];
-  pagos_online: boolean;
-  vendedora_nombre: string;
-  vendedora_whatsapp_url: string;
-  retiro_direccion: string;
-}
-
-export interface Catalogo {
-  categorias: Categoria[];
-  colegios: Colegio[];
-  config: TiendaConfig;
+export interface GrupoDetalle extends Grupo {
+  productos: Producto[];
 }
 
 export interface PedidoItem {
-  colegio_nombre: string;
-  prenda_nombre: string;
-  talle: string;
+  grupo_nombre: string;
+  producto_nombre: string;
+  opcion: string | null;
   cantidad: number;
   precio_unit: string;
 }
@@ -68,12 +77,15 @@ export interface PedidoItem {
 export interface Pedido {
   id: string;
   codigo: string;
+  tienda: TiendaResumen;
+  opcion_label: string;
   estado: EstadoPedido;
-  envio: Envio;
+  entrega: Entrega;
+  entrega_label: string;
   modalidad_pago: ModalidadPago;
   subtotal: string;
-  recargo_express: string;
   envio_monto: string;
+  recargo_express: string;
   total: string;
   pagado_ahora: string;
   saldo: string;
@@ -88,8 +100,8 @@ export interface Pedido {
 export interface PedidoAdmin extends Pedido {
   cliente_tel: string;
   cliente_email: string | null;
-  direccion: string;
-  departamento: string;
+  direccion: string | null;
+  departamento: string | null;
   notas: string | null;
   mp_payment_id: string | null;
   notificado_at: string | null;
@@ -99,6 +111,74 @@ export interface PedidoAdmin extends Pedido {
 export interface PedidoCreado {
   pedido: Pedido;
   init_point: string | null;
+}
+
+/** Lo que edita el dueño de la tienda (PUT /admin/tiendas/:slug). */
+export interface TiendaConfig {
+  nombre: string;
+  descripcion: string | null;
+  grupo_label: string;
+  opcion_label: string;
+  categorias: string[];
+  productos_en_todos: boolean;
+  activo: boolean;
+  vendedor_nombre: string;
+  vendedor_email: string;
+  vendedor_whatsapp: string;
+  envio_habilitado: boolean;
+  envio_monto: string;
+  envio_gratis_desde: string | null;
+  envio_demora: string;
+  departamentos_envio: string[];
+  express_habilitado: boolean;
+  express_recargo_pct: number;
+  express_monto: string;
+  express_demora: string;
+  retiro_habilitado: boolean;
+  retiro_direccion: string | null;
+  sena_habilitada: boolean;
+  sena_pct: number;
+  total_habilitado: boolean;
+}
+
+export interface TiendaAdmin extends TiendaConfig {
+  slug: string;
+}
+
+export interface GrupoAdmin extends Grupo {
+  activo: boolean;
+}
+
+export interface ProductoAdmin {
+  slug: string;
+  nombre: string;
+  descripcion: string | null;
+  tipo: string;
+  precio_base: string;
+  opciones: string[];
+  foto_url: string | null;
+  orden: number;
+  activo: boolean;
+}
+
+export interface PrecioGrupo {
+  grupo: string;
+  producto: string;
+  precio: string | null;
+  disponible: boolean;
+}
+
+export interface CatalogoAdmin {
+  tienda: TiendaAdmin;
+  grupos: GrupoAdmin[];
+  productos: ProductoAdmin[];
+  precios: PrecioGrupo[];
+}
+
+export interface Encargado {
+  id: string;
+  email: string | null;
+  nombre: string;
 }
 
 export const ESTADO_LABEL: Record<EstadoPedido, string> = {
@@ -111,29 +191,14 @@ export const ESTADO_LABEL: Record<EstadoPedido, string> = {
   cancelado: "Cancelado",
 };
 
-export interface ColegioAdmin extends Colegio {
-  activo: boolean;
-}
-
-export interface PrendaAdmin {
-  slug: string;
-  nombre: string;
-  tipo: string;
-  precio_base: string;
-  talles: string[];
-  foto_url: string | null;
-  activo: boolean;
-}
-
-export interface PrecioColegio {
-  colegio: string;
-  prenda: string;
-  precio: string | null;
-  disponible: boolean;
-}
-
-export interface CatalogoAdmin {
-  colegios: ColegioAdmin[];
-  prendas: PrendaAdmin[];
-  precios: PrecioColegio[];
-}
+export const TIPOS_ILUSTRACION: Record<string, string> = {
+  generico: "Genérico",
+  remera: "Remera / chomba",
+  pantalon: "Pantalón",
+  pollera: "Pollera",
+  corbata: "Corbata",
+  buzo: "Buzo / sweater",
+  campera: "Campera",
+  bermuda: "Bermuda / short",
+  jogging: "Jogging",
+};

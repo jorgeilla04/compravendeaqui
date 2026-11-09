@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Levanta el stack de e2e: fake SMTP y Mercado Pago, MinIO, backend (:8010) y frontend (:3010).
+# Otros puertos: E2E_API_PORT=8110 E2E_WEB_PORT=3110 e2e/start-stack.sh, y para
+# Playwright: E2E_API_URL=http://localhost:8110 E2E_BASE_URL=http://localhost:3110.
 # Uso: e2e/start-stack.sh   (Ctrl+C para cortar todo)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -24,13 +26,13 @@ cd "$ROOT/backend"
 .venv/bin/alembic upgrade head >/dev/null
 for _ in $(seq 1 30); do curl -s -o /dev/null localhost:9100 && break; sleep 0.5; done
 .venv/bin/python -m app.scripts.setup_storage
-.venv/bin/python -m app.scripts.import_colegios "$ROOT/e2e/colegios-e2e.json"
-.venv/bin/uvicorn app.main:app --port 8010 --log-level warning &
+.venv/bin/python -m app.scripts.import_grupos uniformes "$ROOT/e2e/colegios-e2e.json"
+.venv/bin/uvicorn app.main:app --port "$E2E_API_PORT" --log-level warning &
 
 cd "$ROOT/frontend"
 if [ "${SKIP_FRONTEND:-0}" != "1" ]; then
-  NEXT_PUBLIC_API_URL=http://localhost:8010 NEXT_PUBLIC_SITE_URL=http://localhost:3010 \
+  NEXT_PUBLIC_API_URL="$E2E_API_URL" NEXT_PUBLIC_SITE_URL="$E2E_BASE_URL" \
     NEXT_PUBLIC_MEDIA_URL=http://localhost:9100 NEXT_DIST_DIR=.next-e2e npm run build >/dev/null
-  NEXT_DIST_DIR=.next-e2e npx next start -p 3010 &
+  NEXT_DIST_DIR=.next-e2e npx next start -p "$E2E_WEB_PORT" &
 fi
 wait

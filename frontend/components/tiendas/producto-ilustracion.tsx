@@ -1,6 +1,6 @@
 /**
- * Ilustración de cada prenda con los colores del colegio, hasta tener fotos
- * reales. Formas planas en un lienzo de 120×120.
+ * Dibujo de cada producto con los colores del grupo, hasta tener fotos
+ * reales. Formas planas en un lienzo de 120×120 ("generico": una bolsa).
  */
 
 const OUTLINE = "rgba(15, 23, 42, 0.35)";
@@ -150,20 +150,21 @@ function Shape({ tipo, c1, c2 }: { tipo: string; c1: string; c2: string }) {
       );
     default:
       return (
-        <rect
-          x="24"
-          y="24"
-          width="72"
-          height="72"
-          rx="12"
-          fill={c1}
-          {...stroke}
-        />
+        <>
+          <path
+            d="M44 40 Q44 20 60 20 Q76 20 76 40"
+            fill="none"
+            stroke={c2 === "#FFFFFF" ? OUTLINE : c2}
+            strokeWidth={5}
+          />
+          <path d="M28 40 L92 40 L98 104 L22 104 Z" fill={c1} {...stroke} />
+          <rect x="28" y="40" width="64" height="8" fill={c2} {...stroke} />
+        </>
       );
   }
 }
 
-export function PrendaIlustracion({
+export function ProductoIlustracion({
   tipo,
   color1,
   color2,

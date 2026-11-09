@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 import { serverGet } from "@/lib/api";
 import { SITE_URL } from "@/lib/constants";
-import type { Catalogo } from "@/lib/uniformes/types";
+import type { Tienda, TiendaResumen } from "@/lib/tiendas/types";
 
 export const revalidate = 3600;
 
@@ -12,24 +12,42 @@ interface Entry {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [entries, uniformes] = await Promise.all([
+  const [entries, tiendas] = await Promise.all([
     serverGet<Entry[]>("/seo/sitemap", undefined, 3600)
       .catch(() => null)
       .then((e) => e ?? []),
-    serverGet<Catalogo>("/uniformes/catalogo", undefined, 3600).catch(
-      () => null,
-    ),
+    serverGet<TiendaResumen[]>("/tiendas", undefined, 3600)
+      .catch(() => null)
+      .then((t) => t ?? []),
   ]);
+  const detalles = await Promise.all(
+    tiendas.map((t) =>
+      serverGet<Tienda>(`/tiendas/${t.slug}`, undefined, 3600).catch(
+        () => null,
+      ),
+    ),
+  );
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL, changeFrequency: "hourly", priority: 1 },
     { url: `${SITE_URL}/terminos`, changeFrequency: "yearly", priority: 0.1 },
     { url: `${SITE_URL}/privacidad`, changeFrequency: "yearly", priority: 0.1 },
-    { url: `${SITE_URL}/uniformes`, changeFrequency: "weekly", priority: 0.8 },
-    ...(uniformes?.colegios ?? []).map((c) => ({
-      url: `${SITE_URL}/uniformes/${c.slug}`,
-      changeFrequency: "weekly" as const,
-      priority: 0.6,
-    })),
+    { url: `${SITE_URL}/tiendas`, changeFrequency: "weekly", priority: 0.8 },
+    ...detalles.flatMap((tienda) =>
+      tienda
+        ? [
+            {
+              url: `${SITE_URL}/tiendas/${tienda.slug}`,
+              changeFrequency: "weekly" as const,
+              priority: 0.7,
+            },
+            ...tienda.grupos.map((g) => ({
+              url: `${SITE_URL}/tiendas/${tienda.slug}/${g.slug}`,
+              changeFrequency: "weekly" as const,
+              priority: 0.6,
+            })),
+          ]
+        : [],
+    ),
   ];
   return [
     ...staticPages,

@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
 
 import { RequireAuth } from "@/components/auth/require-auth";
-import { AdminPanel } from "@/components/uniformes/admin/admin-panel";
+import { TiendaAdminPanel } from "@/components/tiendas/admin/admin-panel";
 
 export const metadata: Metadata = {
-  title: "Administrar la tienda de uniformes",
+  title: "Administrar tienda",
   robots: { index: false },
 };
 
-export default function UniformesAdminPage() {
+export default function TiendaAdminPage({
+  params,
+}: {
+  params: { tienda: string };
+}) {
   return (
     <RequireAuth>
-      <AdminPanel />
+      <TiendaAdminPanel slug={params.tienda} />
     </RequireAuth>
   );
 }

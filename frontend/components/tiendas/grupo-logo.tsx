@@ -1,17 +1,17 @@
 import { cn } from "@/lib/utils";
-import { initials, readableText } from "@/lib/uniformes/color";
-import type { Colegio } from "@/lib/uniformes/types";
+import { initials, readableText } from "@/lib/tiendas/color";
+import type { Grupo } from "@/lib/tiendas/types";
 
 /**
- * Escudo oficial del colegio o, hasta tenerlo (con autorización), un recuadro
- * provisorio con sus iniciales y sus colores.
+ * Logo oficial del grupo (escudo del colegio, por ejemplo) o, hasta tenerlo
+ * con autorización, un recuadro provisorio con sus iniciales y sus colores.
  */
-export function Escudo({
-  colegio,
+export function GrupoLogo({
+  grupo,
   size = "md",
   className,
 }: {
-  colegio: Pick<Colegio, "nombre" | "color1" | "color2" | "logo_url">;
+  grupo: Pick<Grupo, "nombre" | "color1" | "color2" | "logo_url">;
   size?: "sm" | "md" | "lg";
   className?: string;
 }) {
@@ -20,12 +20,12 @@ export function Escudo({
     md: "size-14 text-base",
     lg: "size-20 text-h3",
   }[size];
-  if (colegio.logo_url) {
+  if (grupo.logo_url) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- escudo chico desde el bucket
+      // eslint-disable-next-line @next/next/no-img-element -- logo chico desde el bucket
       <img
-        src={colegio.logo_url}
-        alt={`Escudo de ${colegio.nombre}`}
+        src={grupo.logo_url}
+        alt={`Logo de ${grupo.nombre}`}
         className={cn(
           box,
           "shrink-0 rounded-input bg-card object-contain",
@@ -43,12 +43,12 @@ export function Escudo({
         className,
       )}
       style={{
-        backgroundColor: colegio.color1,
-        borderColor: colegio.color2,
-        color: readableText(colegio.color1),
+        backgroundColor: grupo.color1,
+        borderColor: grupo.color2,
+        color: readableText(grupo.color1),
       }}
     >
-      {initials(colegio.nombre)}
+      {initials(grupo.nombre)}
     </span>
   );
 }

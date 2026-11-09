@@ -2,36 +2,45 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { Escudo } from "@/components/uniformes/escudo";
-import { PrendaCard } from "@/components/uniformes/prenda-card";
+import { GrupoLogo } from "@/components/tiendas/grupo-logo";
+import { ProductoCard } from "@/components/tiendas/producto-card";
 import { serverGet } from "@/lib/api";
-import type { ColegioDetalle } from "@/lib/uniformes/types";
+import { getTienda } from "@/lib/tiendas/server";
+import type { GrupoDetalle } from "@/lib/tiendas/types";
 
-export const revalidate = 300;
+export const revalidate = 60;
 
-type Props = { params: { colegio: string } };
+type Props = { params: { tienda: string; grupo: string } };
 
-async function getColegio(slug: string): Promise<ColegioDetalle | null> {
-  return serverGet<ColegioDetalle>(
-    `/uniformes/colegios/${encodeURIComponent(slug)}`,
+function getGrupo(tienda: string, grupo: string): Promise<GrupoDetalle | null> {
+  return serverGet<GrupoDetalle>(
+    `/tiendas/${encodeURIComponent(tienda)}/grupos/${encodeURIComponent(grupo)}`,
     undefined,
-    300,
+    60,
   );
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const colegio = await getColegio(params.colegio).catch(() => null);
-  if (!colegio) return { title: "Colegio no encontrado" };
+  const [tienda, grupo] = await Promise.all([
+    getTienda(params.tienda).catch(() => null),
+    getGrupo(params.tienda, params.grupo).catch(() => null),
+  ]);
+  if (!tienda || !grupo) return { title: "No encontrado" };
   return {
-    title: `Uniforme ${colegio.nombre}`,
-    description: `Uniforme escolar de ${colegio.nombre} (${colegio.departamento}, San Juan): remeras, pantalones, buzos y más, con envío a domicilio.`,
-    alternates: { canonical: `/uniformes/${colegio.slug}` },
+    title: `${grupo.nombre} · ${tienda.nombre}`,
+    description: `${tienda.nombre}: ${grupo.nombre}${
+      grupo.subtitulo ? ` (${grupo.subtitulo})` : ""
+    }, con envío a tu casa en San Juan.`,
+    alternates: { canonical: `/tiendas/${tienda.slug}/${grupo.slug}` },
   };
 }
 
-export default async function ColegioPage({ params }: Props) {
-  const colegio = await getColegio(params.colegio);
-  if (!colegio) notFound();
+export default async function GrupoPage({ params }: Props) {
+  const [tienda, grupo] = await Promise.all([
+    getTienda(params.tienda),
+    getGrupo(params.tienda, params.grupo),
+  ]);
+  if (!tienda || !grupo) notFound();
   return (
     <div className="flex flex-col gap-6">
       <nav
@@ -39,32 +48,39 @@ export default async function ColegioPage({ params }: Props) {
         className="text-meta text-muted-foreground"
       >
         <Link
-          href="/uniformes"
+          href={`/tiendas/${tienda.slug}`}
           className="underline underline-offset-4 hover:text-primary"
         >
-          Colegios
+          {tienda.nombre}
         </Link>{" "}
-        / <span aria-current="page">{colegio.nombre}</span>
+        / <span aria-current="page">{grupo.nombre}</span>
       </nav>
       <header className="flex items-center gap-4">
-        <Escudo colegio={colegio} size="lg" />
+        <GrupoLogo grupo={grupo} size="lg" />
         <div className="flex flex-col gap-1">
-          <h1 className="font-heading text-h1 font-semibold">
-            {colegio.nombre}
-          </h1>
+          <h1 className="font-heading text-h1 font-semibold">{grupo.nombre}</h1>
           <p className="text-muted-foreground">
-            {colegio.departamento} · Elegí las prendas y el talle de cada una.
+            {grupo.subtitulo ? `${grupo.subtitulo} · ` : ""}Elegí los productos
+            {tienda.opcion_label
+              ? ` y ${tienda.opcion_label.toLowerCase()}`
+              : ""}
+            .
           </p>
         </div>
       </header>
-      {colegio.prendas.length === 0 ? (
+      {grupo.productos.length === 0 ? (
         <p className="text-muted-foreground">
-          Todavía no cargamos las prendas de este colegio.
+          Todavía no hay productos cargados acá.
         </p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {colegio.prendas.map((prenda) => (
-            <PrendaCard key={prenda.slug} colegio={colegio} prenda={prenda} />
+          {grupo.productos.map((producto) => (
+            <ProductoCard
+              key={producto.slug}
+              grupo={grupo}
+              producto={producto}
+              opcionLabel={tienda.opcion_label}
+            />
           ))}
         </ul>
       )}

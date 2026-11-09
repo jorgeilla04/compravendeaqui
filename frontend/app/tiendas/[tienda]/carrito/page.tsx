@@ -1,27 +1,20 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
-import { Checkout } from "@/components/uniformes/checkout";
-import { FormMessage } from "@/components/ui/form";
-import { serverGet } from "@/lib/api";
-import type { Catalogo } from "@/lib/uniformes/types";
+import { Checkout } from "@/components/tiendas/checkout";
+import { getTienda } from "@/lib/tiendas/server";
 
 export const metadata: Metadata = {
-  title: "Carrito de uniformes",
+  title: "Carrito",
   robots: { index: false },
 };
 
-export default async function CarritoPage() {
-  const catalogo = await serverGet<Catalogo>(
-    "/uniformes/catalogo",
-    undefined,
-    60,
-  ).catch(() => null);
-  if (!catalogo) {
-    return (
-      <FormMessage>
-        No pudimos cargar la tienda. Probá de nuevo en unos minutos.
-      </FormMessage>
-    );
-  }
-  return <Checkout config={catalogo.config} />;
+export default async function CarritoPage({
+  params,
+}: {
+  params: { tienda: string };
+}) {
+  const tienda = await getTienda(params.tienda);
+  if (!tienda) notFound();
+  return <Checkout tienda={tienda} />;
 }

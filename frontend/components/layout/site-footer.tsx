@@ -9,10 +9,10 @@ export function SiteFooter() {
           <ul className="flex flex-wrap gap-x-4 gap-y-2">
             <li>
               <Link
-                href="/uniformes"
+                href="/tiendas"
                 className="hover:text-foreground hover:underline"
               >
-                Uniformes escolares
+                Tiendas
               </Link>
             </li>
             <li>

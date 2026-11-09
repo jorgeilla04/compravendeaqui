@@ -37,6 +37,11 @@ export function buildUrl(
   query?: Query,
   base: string = API_URL,
 ): string {
+  // Un segmento ".." (también codificado) llevaría el pedido a otro endpoint.
+  const pathname = path.split("?")[0];
+  if (/(^|\/)(\.|%2e){2}(\/|$)/i.test(pathname) || pathname.includes("//")) {
+    throw new ApiError(400, "Dirección inválida");
+  }
   const url = new URL(`${base}${PREFIX}${path}`);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== null && value !== undefined && value !== "") {

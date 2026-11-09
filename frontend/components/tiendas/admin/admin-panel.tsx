@@ -1,39 +1,39 @@
 "use client";
 
+import Link from "next/link";
 import * as React from "react";
 
-import { ColegiosAdmin } from "@/components/uniformes/admin/colegios-admin";
-import { PedidosAdmin } from "@/components/uniformes/admin/pedidos-admin";
-import { PreciosAdmin } from "@/components/uniformes/admin/precios-admin";
+import { useAuth } from "@/components/auth/auth-provider";
+import { ConfigAdmin } from "@/components/tiendas/admin/config-admin";
+import { EncargadosAdmin } from "@/components/tiendas/admin/encargados-admin";
+import { GruposAdmin } from "@/components/tiendas/admin/grupos-admin";
+import { PedidosAdmin } from "@/components/tiendas/admin/pedidos-admin";
+import { ProductosAdmin } from "@/components/tiendas/admin/productos-admin";
 import { FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { CatalogoAdmin } from "@/lib/uniformes/types";
+import type { CatalogoAdmin } from "@/lib/tiendas/types";
 
-const SECCIONES = [
-  { id: "pedidos", label: "Pedidos" },
-  { id: "colegios", label: "Colegios" },
-  { id: "precios", label: "Precios y fotos" },
-] as const;
-type Seccion = (typeof SECCIONES)[number]["id"];
+type Seccion = "pedidos" | "grupos" | "productos" | "config" | "encargados";
 
-export function AdminPanel() {
+export function TiendaAdminPanel({ slug }: { slug: string }) {
+  const { user } = useAuth();
   const [seccion, setSeccion] = React.useState<Seccion>("pedidos");
   const [catalogo, setCatalogo] = React.useState<CatalogoAdmin | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    api<CatalogoAdmin>("/admin/uniformes/catalogo")
+    api<CatalogoAdmin>(`/admin/tiendas/${encodeURIComponent(slug)}/catalogo`)
       .then(setCatalogo)
       .catch((err) =>
         setError(
-          err instanceof ApiError && err.status === 403
-            ? "Esta sección es solo para administradores de la tienda."
+          err instanceof ApiError && err.status === 404
+            ? "No administrás esta tienda."
             : errorMessage(err),
         ),
       );
-  }, []);
+  }, [slug]);
 
   if (error) return <FormMessage>{error}</FormMessage>;
   if (!catalogo) {
@@ -46,13 +46,39 @@ export function AdminPanel() {
     );
   }
 
+  const { tienda } = catalogo;
+  const secciones: { id: Seccion; label: string }[] = [
+    { id: "pedidos", label: "Pedidos" },
+    { id: "grupos", label: `${tienda.grupo_label}s` },
+    { id: "productos", label: "Productos y precios" },
+    { id: "config", label: "Envío y pagos" },
+    ...(user?.role === "admin"
+      ? [{ id: "encargados" as const, label: "Encargados" }]
+      : []),
+  ];
+
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-heading text-h1 font-semibold">
-        Administrar la tienda
-      </h1>
+      <div className="flex flex-col gap-1">
+        <h1 className="font-heading text-h1 font-semibold">{tienda.nombre}</h1>
+        <p className="text-meta text-muted-foreground">
+          <Link
+            href={`/tiendas/${tienda.slug}`}
+            className="underline underline-offset-4 hover:text-primary"
+          >
+            Ver la tienda
+          </Link>{" "}
+          ·{" "}
+          <Link
+            href="/tiendas/admin"
+            className="underline underline-offset-4 hover:text-primary"
+          >
+            Mis tiendas
+          </Link>
+        </p>
+      </div>
       <div role="group" aria-label="Sección" className="flex flex-wrap gap-2">
-        {SECCIONES.map((s) => (
+        {secciones.map((s) => (
           <button
             key={s.id}
             type="button"
@@ -70,18 +96,26 @@ export function AdminPanel() {
         ))}
       </div>
       <h2 className="sr-only">
-        {SECCIONES.find((s) => s.id === seccion)?.label}
+        {secciones.find((s) => s.id === seccion)?.label}
       </h2>
-      {seccion === "pedidos" ? <PedidosAdmin /> : null}
-      {seccion === "colegios" ? (
-        <ColegiosAdmin
-          colegios={catalogo.colegios}
-          onChange={(colegios) => setCatalogo({ ...catalogo, colegios })}
+      {seccion === "pedidos" ? <PedidosAdmin slug={tienda.slug} /> : null}
+      {seccion === "grupos" ? (
+        <GruposAdmin
+          tienda={tienda}
+          grupos={catalogo.grupos}
+          onChange={(grupos) => setCatalogo({ ...catalogo, grupos })}
         />
       ) : null}
-      {seccion === "precios" ? (
-        <PreciosAdmin catalogo={catalogo} onChange={setCatalogo} />
+      {seccion === "productos" ? (
+        <ProductosAdmin catalogo={catalogo} onChange={setCatalogo} />
       ) : null}
+      {seccion === "config" ? (
+        <ConfigAdmin
+          tienda={tienda}
+          onSaved={(t) => setCatalogo({ ...catalogo, tienda: t })}
+        />
+      ) : null}
+      {seccion === "encargados" ? <EncargadosAdmin slug={tienda.slug} /> : null}
     </div>
   );
 }

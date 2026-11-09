@@ -1,9 +1,9 @@
-import type { Envio, ModalidadPago, TiendaConfig } from "./types";
+import type { Entrega, ModalidadPago, TiendaReglas } from "./types";
 
 export interface Totales {
   subtotal: number;
-  recargoExpress: number;
   envioMonto: number;
+  recargoExpress: number;
   total: number;
   pagadoAhora: number;
   saldo: number;
@@ -15,31 +15,44 @@ function pesos(value: number): number {
 }
 
 /**
- * Totales para mostrar en el carrito. Espejo de `cotizar()` del backend: el
- * monto que se cobra lo calcula siempre el servidor.
+ * Totales para mostrar en el carrito. Espejo de `cotizar()` del backend con
+ * la config de la tienda: el monto que se cobra lo calcula el servidor.
  */
 export function cotizar(
   subtotal: number,
-  envio: Envio,
+  entrega: Entrega,
   modalidad: ModalidadPago,
-  config: Pick<
-    TiendaConfig,
-    "envio_monto" | "express_recargo_pct" | "sena_pct"
+  reglas: Pick<
+    TiendaReglas,
+    | "envio_monto"
+    | "envio_gratis_desde"
+    | "express_recargo_pct"
+    | "express_monto"
+    | "sena_pct"
   >,
 ): Totales {
   const sub = pesos(subtotal);
-  const recargoExpress =
-    envio === "express" ? pesos((sub * config.express_recargo_pct) / 100) : 0;
-  const envioMonto = pesos(config.envio_monto);
-  const total = sub + recargoExpress + envioMonto;
+  let envioMonto = 0;
+  let recargoExpress = 0;
+  if (entrega !== "retiro") {
+    const gratisDesde = reglas.envio_gratis_desde;
+    const gratis = gratisDesde !== null && sub >= Number(gratisDesde);
+    envioMonto = gratis ? 0 : pesos(Number(reglas.envio_monto));
+  }
+  if (entrega === "express") {
+    recargoExpress =
+      pesos((sub * reglas.express_recargo_pct) / 100) +
+      pesos(Number(reglas.express_monto));
+  }
+  const total = sub + envioMonto + recargoExpress;
   const pagadoAhora =
     modalidad === "sena"
-      ? pesos((sub * config.sena_pct) / 100) + envioMonto + recargoExpress
+      ? pesos((sub * reglas.sena_pct) / 100) + envioMonto + recargoExpress
       : total;
   return {
     subtotal: sub,
-    recargoExpress,
     envioMonto,
+    recargoExpress,
     total,
     pagadoAhora,
     saldo: total - pagadoAhora,
