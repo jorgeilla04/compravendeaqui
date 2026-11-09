@@ -75,6 +75,7 @@ class TiendaConfigOut(BaseModel):
     departamentos_envio: list[str]
     pagos_online: bool
     vendedora_nombre: str
+    vendedora_whatsapp_url: str
     retiro_direccion: str
 
 
@@ -105,7 +106,10 @@ class ClienteIn(BaseModel):
     @field_validator("nombre", "direccion")
     @classmethod
     def _strip(cls, value: str) -> str:
-        return " ".join(value.split())
+        cleaned = " ".join(value.split())
+        if len(cleaned) < 2:
+            raise ValueError("Completá este dato")
+        return cleaned
 
     @field_validator("telefono")
     @classmethod
@@ -165,6 +169,8 @@ class PedidoOut(BaseModel):
     created_at: datetime
     pagado_at: datetime | None
     whatsapp_url: str
+    # Para reintentar el pago (solo mientras no esté pagado).
+    pago_url: str | None
 
 
 class PedidoCreadoOut(BaseModel):

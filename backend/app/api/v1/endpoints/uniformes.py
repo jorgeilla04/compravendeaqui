@@ -37,6 +37,7 @@ def tienda_config() -> TiendaConfigOut:
         departamentos_envio=service.DEPARTAMENTOS_ENVIO,
         pagos_online=settings.mp_configured,
         vendedora_nombre=settings.uniformes_vendedora_nombre,
+        vendedora_whatsapp_url=service.whatsapp_consulta_url(),
         retiro_direccion=settings.uniformes_retiro_direccion,
     )
 
@@ -47,6 +48,11 @@ def pedido_out(pedido: Pedido, model: type[PedidoOut] = PedidoOut) -> Any:
         "items": [PedidoItemOut.model_validate(i) for i in pedido.items],
         "whatsapp_url": service.whatsapp_vendedora_url(pedido),
         "cliente_whatsapp_url": service.whatsapp_cliente_url(pedido),
+        "pago_url": (
+            pedido.mp_init_point
+            if pedido.estado in ("pendiente_pago", "rechazado")
+            else None
+        ),
     }
     data = {
         name: extra[name] if name in extra else getattr(pedido, name)
@@ -124,8 +130,13 @@ def ver_pedido(
         "Demasiadas consultas. Probá en unos minutos.",
     )
     pedido = service.get_pedido(db, pedido_id)
-    if payment_id and pedido.estado in ("pendiente_pago", "rechazado"):
-        service.sincronizar_pago(db, payment_id)
+    if (
+        payment_id
+        and payment_id.isdigit()
+        and pedido.estado in ("pendiente_pago", "rechazado")
+    ):
+        # Solo se aplica si ese pago es de este pedido.
+        service.sincronizar_pago(db, payment_id, solo_pedido=pedido.id)
         db.refresh(pedido)
     result: PedidoOut = pedido_out(pedido)
     return result
@@ -134,6 +145,12 @@ def ver_pedido(
 @router.post("/webhooks/mercadopago")
 async def webhook_mercadopago(request: Request, db: DbSession) -> dict[str, bool]:
     """Aviso de Mercado Pago. Nunca se confía en el contenido: se consulta el pago."""
+    ratelimit.enforce(
+        f"rl:uniformes:webhook:{ratelimit.client_ip(request)}",
+        600,
+        60,
+        "Demasiados avisos.",
+    )
     params = request.query_params
     body: dict[str, Any] = {}
     try:
@@ -144,13 +161,18 @@ async def webhook_mercadopago(request: Request, db: DbSession) -> dict[str, bool
     kind = body.get("type") or params.get("type") or params.get("topic")
     raw_data = body.get("data")
     data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else {}
-    data_id = str(data.get("id") or params.get("data.id") or params.get("id") or "")
+    # Mercado Pago firma el id que manda en la URL: es el único que se usa.
+    signed_id = params.get("data.id") or params.get("id") or ""
+    body_id = str(data.get("id") or "")
+    if signed_id and body_id and signed_id != body_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Id inconsistente")
+    data_id = signed_id or body_id
     if kind != "payment" or not data_id:
         return {"ok": True}  # otros avisos (merchant_order, etc.): no se usan
     if not mercadopago.valid_signature(
         x_signature=request.headers.get("x-signature"),
         x_request_id=request.headers.get("x-request-id"),
-        data_id=params.get("data.id") or data_id,
+        data_id=data_id,
     ):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Firma inválida")
     service.sincronizar_pago(db, data_id)

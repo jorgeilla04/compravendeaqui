@@ -174,6 +174,11 @@ class Settings(BaseSettings):
             )
         if self.is_production and not self.cookie_secure:
             raise ValueError("COOKIE_SECURE=true es obligatorio en producción")
+        if self.is_production and self.mp_access_token and not self.mp_webhook_secret:
+            raise ValueError(
+                "MP_WEBHOOK_SECRET es obligatorio en producción si MP_ACCESS_TOKEN "
+                "está configurado (Mercado Pago → Tus integraciones → Webhooks)"
+            )
         return self
 
     @property

@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import io
 import json
+import time
 from collections.abc import Callable
 from decimal import Decimal
 from email.message import EmailMessage
@@ -157,6 +158,11 @@ def test_catalogo_publico(client: TestClient, colegio: dict[str, Any]) -> None:
             "logo_url": None,
         }
     ]
+    assert (
+        data["config"]
+        .pop("vendedora_whatsapp_url")
+        .startswith("https://wa.me/5492645408193?text=")
+    )
     assert data["config"] == {
         "envio_monto": 5000,
         "express_recargo_pct": 20,
@@ -324,6 +330,8 @@ def test_pedido_valida_datos_del_cliente(
     muchos = pedido_body(colegio["slug"])
     muchos["items"][0]["cantidad"] = 21
     assert client.post("/api/v1/uniformes/pedidos", json=muchos).status_code == 422
+    espacios = pedido_body(colegio["slug"], cliente={**CLIENTE, "nombre": "   "})
+    assert client.post("/api/v1/uniformes/pedidos", json=espacios).status_code == 422
     vacio = pedido_body(colegio["slug"], items=[])
     assert client.post("/api/v1/uniformes/pedidos", json=vacio).status_code == 422
 
@@ -374,6 +382,7 @@ def test_pedido_con_mp_crea_preferencia(
         "https://compravendeaqui.test/api/v1/uniformes/webhooks/mercadopago"
     )
     assert db.scalars(select(Pedido)).one().mp_preference_id == "pref-123"
+    assert data["pedido"]["pago_url"] == "https://mp.test/checkout/pref-123"
 
 
 @respx.mock
@@ -467,10 +476,13 @@ def test_vuelta_de_mp_rechazado_y_luego_aprobado(
         route.mock(
             return_value=httpx.Response(200, json=_pago(pedido["id"], "rejected"))
         )
-        assert client.get(url).json()["estado"] == "rechazado"
+        rechazado = client.get(url).json()
+        assert rechazado["estado"] == "rechazado"
+        assert rechazado["pago_url"] == "https://x"  # puede volver a intentar
         # Reintenta y paga: el mismo pedido pasa a pagado.
         route.mock(return_value=httpx.Response(200, json=_pago(pedido["id"])))
-        assert client.get(url).json()["estado"] == "pagado"
+        pagado = client.get(url).json()
+        assert pagado["estado"] == "pagado" and pagado["pago_url"] is None
         # Ya pagado: no vuelve a consultar.
         calls = route.call_count
         client.get(url)
@@ -486,14 +498,23 @@ def test_pago_de_otro_pedido_no_cuenta(
         respx.get(f"{MP}/v1/payments/987654321").mock(
             return_value=httpx.Response(200, json=_pago(otro["id"]))
         )
-        # Vuelve con el payment_id del otro pedido: se aplica al otro, no a este.
+        # Vuelve con el payment_id de otro pedido: no se aplica a ninguno.
         estado = client.get(
             f"/api/v1/uniformes/pedidos/{pedido['id']}?payment_id=987654321"
         ).json()
-    assert estado["estado"] == "pendiente_pago"
-    assert client.get(f"/api/v1/uniformes/pedidos/{otro['id']}").json()["estado"] == (
-        "pagado"
-    )
+        assert estado["estado"] == "pendiente_pago"
+        otro_estado = client.get(f"/api/v1/uniformes/pedidos/{otro['id']}").json()
+        assert otro_estado["estado"] == "pendiente_pago"
+        # Un payment_id que no es número ni se consulta.
+        client.get(f"/api/v1/uniformes/pedidos/{pedido['id']}?payment_id=1;drop")
+
+
+def _firma(
+    data_id: str, request_id: str, ts: int, secret: str = "secreto-webhook"
+) -> str:
+    manifest = f"id:{data_id};request-id:{request_id};ts:{ts};"
+    v1 = hmac.new(secret.encode(), manifest.encode(), hashlib.sha256).hexdigest()
+    return f"ts={ts},v1={v1}"
 
 
 def test_webhook_firma(
@@ -507,24 +528,73 @@ def test_webhook_firma(
     hook = TestClient(client.app)
     path = "/api/v1/uniformes/webhooks/mercadopago?data.id=987654321&type=payment"
     body = {"type": "payment", "data": {"id": "987654321"}}
-    bad = hook.post(path, json=body, headers={"x-signature": "ts=1,v1=deadbeef"})
-    assert bad.status_code == 401
-    assert hook.post(path, json=body).status_code == 401
+    now = int(time.time())
+    casos = [
+        {"x-signature": "ts=1,v1=deadbeef", "x-request-id": "req-1"},
+        {},  # sin firma
+        {"x-signature": _firma("987654321", "req-1", now)},  # sin request-id
+        # Firma válida pero vieja (reenvío): se rechaza.
+        {
+            "x-signature": _firma("987654321", "req-1", now - 600),
+            "x-request-id": "req-1",
+        },
+        # Firmada para otro pago.
+        {"x-signature": _firma("111", "req-1", now), "x-request-id": "req-1"},
+    ]
+    for headers in casos:
+        assert hook.post(path, json=body, headers=headers).status_code == 401
 
-    manifest = "id:987654321;request-id:req-1;ts:1700000000;"
-    v1 = hmac.new(b"secreto-webhook", manifest.encode(), hashlib.sha256).hexdigest()
     with respx.mock:
         respx.get(f"{MP}/v1/payments/987654321").mock(
             return_value=httpx.Response(200, json=_pago(pedido["id"]))
         )
+        # ts en milisegundos también vale.
         ok = hook.post(
             path,
             json=body,
-            headers={"x-signature": f"ts=1700000000,v1={v1}", "x-request-id": "req-1"},
+            headers={
+                "x-signature": _firma("987654321", "req-1", now * 1000),
+                "x-request-id": "req-1",
+            },
         )
     assert ok.status_code == 200
     assert client.get(f"/api/v1/uniformes/pedidos/{pedido['id']}").json()["estado"] == (
         "pagado"
+    )
+
+
+def test_webhook_id_de_la_url_y_del_cuerpo_tienen_que_coincidir(
+    client: TestClient, mp: None
+) -> None:
+    hook = TestClient(client.app)
+    response = hook.post(
+        "/api/v1/uniformes/webhooks/mercadopago?data.id=111&type=payment",
+        json={"type": "payment", "data": {"id": "222"}},
+    )
+    assert response.status_code == 400
+
+
+def test_en_produccion_mp_exige_secreto_del_webhook() -> None:
+    from app.config import Settings
+
+    base = dict(
+        environment="production",
+        jwt_secret_key="x" * 40,
+        cookie_secure=True,
+        mp_access_token="APP_USR-1",
+    )
+    with pytest.raises(ValueError, match="MP_WEBHOOK_SECRET"):
+        Settings(**base)  # type: ignore[arg-type]
+    prod = Settings(**base, mp_webhook_secret="s")  # type: ignore[arg-type]
+    prod_sin = prod.model_copy(update={"mp_webhook_secret": ""})
+    from app.services.mercadopago import valid_signature
+
+    # Si igual faltara el secreto en producción, la firma falla (no deja pasar).
+    assert (
+        valid_signature(
+            x_signature=None, x_request_id=None, data_id="1", config=prod_sin
+        )
+        is False
     )
 
 
@@ -591,6 +661,17 @@ def test_admin_colegios(admin: TestClient, colegio: dict[str, Any]) -> None:
         },
     )
     assert repetido.json()["slug"] == "colegio-santa-rosa-de-lima-2"
+    reservado = admin.post(
+        "/api/v1/admin/uniformes/colegios",
+        json={
+            "nombre": "Carrito",
+            "departamento": "Capital",
+            "categoria": "privados",
+            "color1": "#000000",
+            "color2": "#FFFFFF",
+        },
+    )
+    assert reservado.json()["slug"] == "colegio-carrito"
     malo = admin.post(
         "/api/v1/admin/uniformes/colegios",
         json={
@@ -697,3 +778,23 @@ def test_make_admin(make_user: MakeUser, db: Any) -> None:
     assert client.get("/api/v1/admin/uniformes/pedidos").status_code == 200
     assert set_role("jefe@mail.com", admin=False) is True
     assert client.get("/api/v1/admin/uniformes/pedidos").status_code == 403
+
+
+def test_si_el_aviso_falla_el_pedido_igual_queda(
+    client: TestClient,
+    colegio: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    db: Any,
+) -> None:
+    monkeypatch.setattr(settings, "smtp_host", "smtp.test")
+    monkeypatch.setattr(settings, "email_from", "x@cva.test")
+
+    def boom(msg: EmailMessage, config: Any = None) -> str:
+        raise RuntimeError("se cayó todo")
+
+    monkeypatch.setattr(mailer, "send", boom)
+    response = client.post(
+        "/api/v1/uniformes/pedidos", json=pedido_body(colegio["slug"])
+    )
+    assert response.status_code == 201
+    assert db.scalars(select(Pedido)).one().notificado_at is None

@@ -177,9 +177,23 @@ def _codigo(db: Session) -> str:
             return code
 
 
+def _primer_nombre(nombre: str) -> str:
+    return (nombre.split() or [""])[0]
+
+
+def whatsapp_consulta_url() -> str:
+    """Consulta general a la vendedora (sin pedido)."""
+    text = (
+        f"Hola {_primer_nombre(settings.uniformes_vendedora_nombre)}, "
+        "te escribo por los uniformes escolares de CompraVendeAquí."
+    )
+    digits = wa_digits(settings.uniformes_vendedora_whatsapp)
+    return f"https://wa.me/{digits}?text={quote(text)}"
+
+
 def whatsapp_vendedora_url(pedido: Pedido) -> str:
     text = (
-        f"Hola {settings.uniformes_vendedora_nombre.split()[0]}, "
+        f"Hola {_primer_nombre(settings.uniformes_vendedora_nombre)}, "
         f"te escribo por mi pedido de uniformes {pedido.codigo}."
     )
     digits = wa_digits(settings.uniformes_vendedora_whatsapp)
@@ -188,7 +202,7 @@ def whatsapp_vendedora_url(pedido: Pedido) -> str:
 
 def whatsapp_cliente_url(pedido: Pedido) -> str:
     text = (
-        f"Hola {pedido.cliente_nombre.split()[0]}, te escribo de CompraVendeAquí "
+        f"Hola {_primer_nombre(pedido.cliente_nombre)}, te escribo de CompraVendeAquí "
         f"por tu pedido de uniformes {pedido.codigo}."
     )
     return f"https://wa.me/{wa_digits(pedido.cliente_tel)}?text={quote(text)}"
@@ -308,6 +322,7 @@ def crear_pedido(
             pedido.mp_preference_id, init_point = mercadopago.create_preference(
                 payload, idempotency_key=str(pedido.id)
             )
+            pedido.mp_init_point = init_point
         except mercadopago.MercadoPagoError as exc:
             db.rollback()
             log.error("uniformes.mp_preference_failed", error=str(exc))
@@ -341,7 +356,9 @@ def get_pedido(db: Session, pedido_id: uuid.UUID) -> Pedido:
 # --- Pagos --------------------------------------------------------------------
 
 
-def aplicar_pago(db: Session, payment: dict[str, Any]) -> Pedido | None:
+def aplicar_pago(
+    db: Session, payment: dict[str, Any], solo_pedido: uuid.UUID | None = None
+) -> Pedido | None:
     """Actualiza el pedido según un pago consultado a la API de Mercado Pago.
 
     Solo marca "pagado" si el pago está aprobado, es en pesos, corresponde al
@@ -350,6 +367,9 @@ def aplicar_pago(db: Session, payment: dict[str, Any]) -> Pedido | None:
     try:
         pedido_id = uuid.UUID(str(payment.get("external_reference")))
     except ValueError:
+        return None
+    if solo_pedido is not None and pedido_id != solo_pedido:
+        log.warning("uniformes.pago_de_otro_pedido", pedido=str(solo_pedido))
         return None
     pedido = db.get(Pedido, pedido_id, with_for_update=True)
     if pedido is None:
@@ -387,8 +407,13 @@ def aplicar_pago(db: Session, payment: dict[str, Any]) -> Pedido | None:
     return pedido
 
 
-def sincronizar_pago(db: Session, payment_id: str) -> Pedido | None:
-    """Consulta el pago a Mercado Pago y lo aplica (webhook o vuelta del cliente)."""
+def sincronizar_pago(
+    db: Session, payment_id: str, solo_pedido: uuid.UUID | None = None
+) -> Pedido | None:
+    """Consulta el pago a Mercado Pago y lo aplica (webhook o vuelta del cliente).
+
+    solo_pedido: si viene, el pago solo se aplica a ese pedido.
+    """
     if not settings.mp_configured:
         return None
     try:
@@ -396,7 +421,7 @@ def sincronizar_pago(db: Session, payment_id: str) -> Pedido | None:
     except mercadopago.MercadoPagoError as exc:
         log.warning("uniformes.mp_payment_lookup_failed", error=str(exc))
         return None
-    return aplicar_pago(db, payment)
+    return aplicar_pago(db, payment, solo_pedido)
 
 
 # --- Aviso a la vendedora -----------------------------------------------------
@@ -443,6 +468,13 @@ def _resumen_texto(pedido: Pedido) -> str:
 
 def notificar_vendedora(db: Session, pedido: Pedido) -> None:
     """Mail a la vendedora con el detalle. Si falla, el pedido igual queda."""
+    try:
+        _notificar_vendedora(db, pedido)
+    except Exception as exc:  # nunca romper un pedido ya guardado
+        log.error("uniformes.aviso_error", codigo=pedido.codigo, error=repr(exc))
+
+
+def _notificar_vendedora(db: Session, pedido: Pedido) -> None:
     if not settings.email_configured:
         log.warning("uniformes.aviso_sin_email", codigo=pedido.codigo)
         return
@@ -473,8 +505,14 @@ def notificar_vendedora(db: Session, pedido: Pedido) -> None:
 # --- Administración -----------------------------------------------------------
 
 
+# Rutas de la tienda (/uniformes/<slug>): un colegio no puede llamarse así.
+RESERVED_SLUGS = {"admin", "carrito", "pedido"}
+
+
 def unique_slug(db: Session, nombre: str, exclude: uuid.UUID | None = None) -> str:
     base = slugify(nombre) or "colegio"
+    if base in RESERVED_SLUGS:
+        base = f"colegio-{base}"
     candidate, n = base, 2
     while True:
         query = select(Colegio.id).where(Colegio.slug == candidate)

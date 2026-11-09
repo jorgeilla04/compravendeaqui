@@ -102,6 +102,8 @@ class Pedido(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # entregado | cancelado
     estado: Mapped[str] = mapped_column(String(20), index=True)
     mp_preference_id: Mapped[str | None] = mapped_column(String(80))
+    # Link de pago de la preferencia: permite reintentar si el pago no salió.
+    mp_init_point: Mapped[str | None] = mapped_column(Text)
     mp_payment_id: Mapped[str | None] = mapped_column(String(40))
     pagado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     notificado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

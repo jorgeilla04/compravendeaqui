@@ -125,6 +125,7 @@ def upgrade() -> None:
         sa.Column("saldo", MONEY, nullable=False),
         sa.Column("estado", sa.String(20), nullable=False),
         sa.Column("mp_preference_id", sa.String(80), nullable=True),
+        sa.Column("mp_init_point", sa.Text(), nullable=True),
         sa.Column("mp_payment_id", sa.String(40), nullable=True),
         sa.Column("pagado_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("notificado_at", sa.DateTime(timezone=True), nullable=True),
