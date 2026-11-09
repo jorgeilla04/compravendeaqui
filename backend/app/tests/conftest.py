@@ -32,6 +32,8 @@ for _secret in (
     "TWILIO_MESSAGING_SERVICE_SID",
     "SMTP_HOST",
     "EMAIL_FROM",
+    "MP_ACCESS_TOKEN",
+    "MP_WEBHOOK_SECRET",
 ):
     os.environ[_secret] = ""
 os.environ["S3_ACCESS_KEY_ID"] = "test"
@@ -81,8 +83,16 @@ def _clean_state() -> Iterator[None]:
     with engine.begin() as conn:
         conn.execute(
             text(
-                "TRUNCATE listing_images, listings, refresh_tokens, otp_codes, users "
-                "RESTART IDENTITY CASCADE"
+                "TRUNCATE listing_images, listings, refresh_tokens, otp_codes, users, "
+                "uniformes_pedido_items, uniformes_pedidos, uniformes_precios, "
+                "uniformes_colegios RESTART IDENTITY CASCADE"
+            )
+        )
+        # Las prendas vienen de la migración: se restauran, no se borran.
+        conn.execute(
+            text(
+                "UPDATE uniformes_prendas SET precio_base = 10000, activo = true, "
+                "foto_url = NULL"
             )
         )
     get_redis().flushdb()

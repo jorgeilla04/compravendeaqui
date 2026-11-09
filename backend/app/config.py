@@ -114,6 +114,28 @@ class Settings(BaseSettings):
     # Adónde lleva el link del mail si el usuario no venía de otra página.
     email_link_default_next: str = "/publicar"
 
+    # --- Tienda de uniformes ---
+    # Envío en el Gran San Juan (48 hs) y recargo del express (24 hs) sobre
+    # el valor de los uniformes.
+    uniformes_envio_monto: int = 5000
+    uniformes_express_recargo_pct: int = 20
+    # Seña: % del valor de los uniformes, más el envío (y el express).
+    uniformes_sena_pct: int = 10
+    uniformes_vendedora_nombre: str = "Virginia Tello"
+    uniformes_vendedora_email: str = "virginialauratello@gmail.com"
+    uniformes_vendedora_whatsapp: str = "+5492645408193"
+    uniformes_retiro_direccion: str = "Santiago del Estero Sur 1131, Capital"
+
+    # --- Mercado Pago (Checkout Pro) ---
+    # El Access Token vive solo en el backend; nunca llega al navegador.
+    mp_access_token: str = ""
+    # Clave secreta de las notificaciones (Tus integraciones → Webhooks):
+    # si está, se valida la firma x-signature de cada aviso.
+    mp_webhook_secret: str = ""
+    mp_api_base_url: str = "https://api.mercadopago.com"
+    # Texto que ve el comprador en el resumen de la tarjeta (máx. 22).
+    mp_statement_descriptor: str = "COMPRAVENDEAQUI"
+
     # --- Cotización USD/ARS ---
     fx_api_url: str = "https://dolarapi.com/v1/dolares/blue"
     # Campo del JSON que se usa como cotización ("venta" o "compra").
@@ -183,6 +205,10 @@ class Settings(BaseSettings):
     @property
     def email_configured(self) -> bool:
         return bool(self.smtp_host and self.email_from)
+
+    @property
+    def mp_configured(self) -> bool:
+        return bool(self.mp_access_token)
 
     @property
     def s3_configured(self) -> bool:

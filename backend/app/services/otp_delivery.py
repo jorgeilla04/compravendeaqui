@@ -9,11 +9,8 @@ los canales de OTP_CHANNELS en orden y usa el siguiente si uno falla.
 from __future__ import annotations
 
 import html
-import smtplib
-import ssl
 from dataclasses import dataclass
 from email.message import EmailMessage
-from email.utils import make_msgid
 from typing import Any, Protocol
 
 import httpx
@@ -21,11 +18,11 @@ import httpx
 from app.config import Settings, settings
 from app.core.logging import get_logger
 from app.core.phone import mask_destination, wa_digits
+from app.services import mailer
 
 log = get_logger(__name__)
 
 HTTP_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
-SMTP_TIMEOUT = 15
 
 
 class OtpDeliveryError(Exception):
@@ -56,12 +53,9 @@ class EmailOtpSender:
 
     def message(self, destination: str, code: str, link: str | None) -> EmailMessage:
         minutes = self.config.email_otp_ttl_minutes
-        msg = EmailMessage()
-        msg["Subject"] = f"{code} es tu código de CompraVendeAqui"
-        msg["From"] = self.config.email_from
-        msg["To"] = destination
-        domain = self.config.email_from.rpartition("@")[2].strip("> ") or None
-        msg["Message-ID"] = make_msgid(domain=domain)
+        msg = mailer.new_message(
+            destination, f"{code} es tu código de CompraVendeAqui", self.config
+        )
 
         lines = [
             "¡Hola!",
@@ -85,33 +79,10 @@ class EmailOtpSender:
         return msg
 
     def send(self, destination: str, code: str, link: str | None = None) -> str:
-        c = self.config
-        msg = self.message(destination, code, link)
         try:
-            smtp: smtplib.SMTP
-            if c.smtp_security == "ssl":
-                smtp = smtplib.SMTP_SSL(
-                    c.smtp_host,
-                    c.smtp_port,
-                    timeout=SMTP_TIMEOUT,
-                    context=ssl.create_default_context(),
-                )
-            else:
-                smtp = smtplib.SMTP(c.smtp_host, c.smtp_port, timeout=SMTP_TIMEOUT)
-            with smtp:
-                if c.smtp_security == "starttls":
-                    smtp.starttls(context=ssl.create_default_context())
-                if c.smtp_username:
-                    smtp.login(c.smtp_username, c.smtp_password)
-                refused = smtp.send_message(msg)
-        except (smtplib.SMTPException, OSError) as exc:
-            # Sin str(exc): algunos errores SMTP incluyen las direcciones.
-            err = getattr(exc, "smtp_code", None) or getattr(exc, "errno", None)
-            raise OtpDeliveryError(f"email: {type(exc).__name__} code={err}") from exc
-        if refused:
-            codes = {mask_destination(addr): err[0] for addr, err in refused.items()}
-            raise OtpDeliveryError(f"email: destinatario rechazado {codes}")
-        return str(msg["Message-ID"])
+            return mailer.send(self.message(destination, code, link), self.config)
+        except mailer.MailError as exc:
+            raise OtpDeliveryError(f"email: {exc}") from exc
 
 
 def _email_html(code: str, link: str | None, minutes: int) -> str:
