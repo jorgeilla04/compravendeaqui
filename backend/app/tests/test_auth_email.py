@@ -283,7 +283,46 @@ def test_phone_verified_by_another_account_cannot_be_used(
     )
     taken = _register(client, phone="264 477-7666")
     assert taken.status_code == 409
-    assert taken.json()["detail"] == "Ese celular ya está en uso"
+    assert taken.json()["detail"].startswith("No podemos usar ese celular")
     assert _register(client, phone="264 477-7667").status_code == 200
     again = client.put("/api/v1/users/me", json={"phone": "2644777666"})
     assert again.status_code == 409
+
+
+def test_verifying_a_phone_releases_it_from_unverified_profiles(
+    client: TestClient,
+    otp_sender: RecordingSender,
+    db: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Alguien con ingreso por email carga como contacto un celular ajeno.
+    client.post("/api/v1/auth/otp/request", json={"email": EMAIL})
+    client.post(
+        "/api/v1/auth/otp/verify", json={"email": EMAIL, "code": otp_sender.last_code()}
+    )
+    assert _register(client, phone="2644333222").status_code == 200
+
+    # El dueño real ingresa con ese celular: el número deja de ser del otro.
+    monkeypatch.setattr(settings, "login_method", "phone")
+    owner = TestClient(client.app, headers=dict(client.headers))
+    login(owner, otp_sender, "2644333222")
+    squatter = db.scalars(select(User).where(User.email == NORMALIZED)).one()
+    assert squatter.phone is None
+    owner_row = db.scalars(select(User).where(User.phone == "+5492644333222")).one()
+    assert owner_row.phone_verified is True
+
+
+def test_profile_changes_are_rate_limited(
+    client: TestClient, otp_sender: RecordingSender
+) -> None:
+    client.post("/api/v1/auth/otp/request", json={"email": EMAIL})
+    client.post(
+        "/api/v1/auth/otp/verify", json={"email": EMAIL, "code": otp_sender.last_code()}
+    )
+    _register(client, phone="2644123456")
+    statuses = [
+        client.put("/api/v1/users/me", json={"full_name": f"Juan {i}"}).status_code
+        for i in range(21)
+    ]
+    assert statuses[:19] == [200] * 19
+    assert statuses[-1] == 429

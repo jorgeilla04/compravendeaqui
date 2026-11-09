@@ -257,6 +257,14 @@ def _find_or_create(db: Session, destination: str) -> tuple[User, bool]:
             .where(User.email == destination, User.email_verified.is_(False))
             .values(email=None)
         )
+    else:
+        # Quien verifica el celular es su dueño: deja de ser el contacto de
+        # perfiles que lo habían cargado sin verificar.
+        db.execute(
+            update(User)
+            .where(User.phone == destination, User.phone_verified.is_(False))
+            .values(phone=None)
+        )
     user = User(
         phone=None if _is_email(destination) else destination,
         email=destination if _is_email(destination) else None,

@@ -11,6 +11,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.core import ratelimit
 from app.core.logging import get_logger
 from app.core.phone import mask_phone
 from app.models import Listing, User
@@ -59,6 +60,13 @@ def _ensure_unique(db: Session, user: User, field: str, value: str) -> None:
 
 
 def update_profile(db: Session, user: User, data: UserUpdateIn) -> User:
+    # Límite de cambios: evita usar el perfil para sondear qué datos existen.
+    ratelimit.enforce(
+        f"rl:profile:{user.id}",
+        20,
+        900,
+        "Hiciste muchos cambios seguidos. Probá en unos minutos.",
+    )
     changes = data.model_dump(exclude_unset=True)
     if changes.get("username"):
         _ensure_unique(db, user, "username", changes["username"])
@@ -98,7 +106,11 @@ def update_profile(db: Session, user: User, data: UserUpdateIn) -> User:
         )
         if taken:
             raise HTTPException(
-                status.HTTP_409_CONFLICT, detail="Ese celular ya está en uso"
+                status.HTTP_409_CONFLICT,
+                detail=(
+                    "No podemos usar ese celular. Si es tuyo, escribinos al "
+                    "contacto que figura en Términos y lo revisamos."
+                ),
             )
         # Ingreso por email: es el WhatsApp de contacto, sin verificar.
         user.phone_verified = False
