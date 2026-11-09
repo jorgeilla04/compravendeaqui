@@ -6,7 +6,7 @@ Las variables se leen de entorno o de un archivo .env. Ver .env.example.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -69,8 +69,14 @@ class Settings(BaseSettings):
     auth_lock_minutes: int = 30
 
     # --- OTP ---
+    # Con qué se ingresa: "email" (código + link por mail) o "phone"
+    # (WhatsApp/SMS). Es el único interruptor: el frontend lo lee de
+    # GET /auth/methods.
+    login_method: Literal["email", "phone"] = "email"
     otp_length: int = 6
     otp_ttl_minutes: int = 5
+    # El mail puede demorar o abrirse después en otro dispositivo.
+    email_otp_ttl_minutes: int = 15
     otp_resend_cooldown_seconds: int = 60
     otp_max_sends_per_hour: int = 5
     # Pedidos de OTP por IP y por hora (anti-abuso del costo de envío).
@@ -95,6 +101,18 @@ class Settings(BaseSettings):
     # Uno de los dos: número remitente o Messaging Service.
     twilio_from_number: str = ""
     twilio_messaging_service_sid: str = ""
+
+    # Email (SMTP): sirve cualquier proveedor (Gmail, Brevo, Resend, SES...).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    # "starttls" (puerto 587), "ssl" (puerto 465) o "none" (solo pruebas locales).
+    smtp_security: Literal["starttls", "ssl", "none"] = "starttls"
+    # Remitente, ej: "CompraVendeAqui <no-responder@compravendeaqui.com.ar>"
+    email_from: str = ""
+    # Adónde lleva el link del mail si el usuario no venía de otra página.
+    email_link_default_next: str = "/publicar"
 
     # --- Cotización USD/ARS ---
     fx_api_url: str = "https://dolarapi.com/v1/dolares/blue"
@@ -155,6 +173,16 @@ class Settings(BaseSettings):
             and self.twilio_auth_token
             and (self.twilio_from_number or self.twilio_messaging_service_sid)
         )
+
+    def otp_ttl_for(self, destination: str) -> int:
+        """Minutos de vigencia del código según el canal (email o teléfono)."""
+        return (
+            self.email_otp_ttl_minutes if "@" in destination else self.otp_ttl_minutes
+        )
+
+    @property
+    def email_configured(self) -> bool:
+        return bool(self.smtp_host and self.email_from)
 
     @property
     def s3_configured(self) -> bool:

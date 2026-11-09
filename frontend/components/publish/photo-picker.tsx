@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Star, Trash2 } from "lucide-react";
+import { Camera, ImagePlus, Star, Trash2 } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,26 @@ import { cn } from "@/lib/utils";
 
 import { ACCEPT_ATTR, MAX_PHOTOS, MAX_PHOTO_MB } from "./photo-files";
 
+const pickerClass = cn(
+  "inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-input border border-dashed border-primary bg-card px-5 text-base font-semibold text-foreground transition-colors duration-200 hover:bg-muted sm:w-auto",
+  "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background",
+);
+
+function filesFrom(
+  event: React.ChangeEvent<HTMLInputElement>,
+  onFiles: (files: File[]) => void,
+) {
+  const files = Array.from(event.target.files ?? []);
+  // Permite volver a elegir el mismo archivo.
+  event.target.value = "";
+  if (files.length > 0) onFiles(files);
+}
+
 /**
- * Botón para elegir fotos (galería o cámara: no forzamos `capture`).
- * El input nativo queda dentro del label para conservar foco y teclado.
+ * Botones para sumar fotos: "Sacar foto" abre directo la cámara trasera
+ * (solo en pantallas táctiles: en la compu `capture` no hace nada) y el otro
+ * elige de la galería o de archivos. Cada input nativo queda dentro de su
+ * label para conservar foco y teclado.
  */
 export function PhotoPicker({
   id,
@@ -27,34 +44,51 @@ export function PhotoPicker({
 }) {
   const full = count >= MAX_PHOTOS;
   const hintId = `${id}-hint`;
+  const off = disabled || full;
   return (
     <div className="flex flex-col gap-1.5">
-      <label
-        htmlFor={id}
-        className={cn(
-          "inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-input border border-dashed border-primary bg-card px-5 text-base font-semibold text-foreground transition-colors duration-200 hover:bg-muted sm:w-auto sm:self-start",
-          "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background",
-          (disabled || full) && "pointer-events-none opacity-50",
+      <div className="flex flex-col gap-2 sm:flex-row">
+        {full ? null : (
+          <label
+            htmlFor={`${id}-camera`}
+            className={cn(
+              pickerClass,
+              "hidden border-solid [@media(pointer:coarse)]:inline-flex",
+              off && "pointer-events-none opacity-50",
+            )}
+          >
+            <Camera aria-hidden="true" className="size-5" />
+            Sacar foto
+            <input
+              id={`${id}-camera`}
+              type="file"
+              accept={ACCEPT_ATTR}
+              capture="environment"
+              disabled={off}
+              aria-describedby={hintId}
+              className="sr-only"
+              onChange={(e) => filesFrom(e, onFiles)}
+            />
+          </label>
         )}
-      >
-        <ImagePlus aria-hidden="true" className="size-5" />
-        {full ? "Llegaste al máximo de fotos" : label}
-        <input
-          id={id}
-          type="file"
-          accept={ACCEPT_ATTR}
-          multiple
-          disabled={disabled || full}
-          aria-describedby={hintId}
-          className="sr-only"
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? []);
-            // Permite volver a elegir el mismo archivo.
-            e.target.value = "";
-            if (files.length > 0) onFiles(files);
-          }}
-        />
-      </label>
+        <label
+          htmlFor={id}
+          className={cn(pickerClass, off && "pointer-events-none opacity-50")}
+        >
+          <ImagePlus aria-hidden="true" className="size-5" />
+          {full ? "Llegaste al máximo de fotos" : label}
+          <input
+            id={id}
+            type="file"
+            accept={ACCEPT_ATTR}
+            multiple
+            disabled={off}
+            aria-describedby={hintId}
+            className="sr-only"
+            onChange={(e) => filesFrom(e, onFiles)}
+          />
+        </label>
+      </div>
       <p id={hintId} className="text-meta text-muted-foreground">
         {count} de {MAX_PHOTOS} fotos. JPG, PNG o WEBP de hasta {MAX_PHOTO_MB}{" "}
         MB cada una. La primera es la portada.

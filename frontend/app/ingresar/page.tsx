@@ -3,15 +3,17 @@ import { Suspense } from "react";
 
 import { LoginFlow } from "@/components/auth/login/login-flow";
 import { Skeleton } from "@/components/ui/skeleton";
+import { loginMethod } from "@/lib/login-method";
 
 export const metadata: Metadata = {
   title: "Ingresar",
   description:
-    "Ingresá a CompraVendeAqui con tu celular. Te mandamos un código por WhatsApp.",
+    "Ingresá a CompraVendeAqui. Si es tu primera vez, creamos tu cuenta en el momento.",
   robots: { index: false },
 };
 
-export default function IngresarPage() {
+export default async function IngresarPage() {
+  const method = await loginMethod();
   return (
     <div className="mx-auto w-full max-w-md py-4 sm:py-10">
       <Suspense
@@ -23,7 +25,7 @@ export default function IngresarPage() {
           </div>
         }
       >
-        <LoginFlow />
+        <LoginFlow method={method} />
       </Suspense>
     </div>
   );

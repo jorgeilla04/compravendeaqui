@@ -54,3 +54,16 @@ def mask_phone(phone: str) -> str:
 def wa_digits(phone: str) -> str:
     """Formato que esperan wa.me y la Cloud API: solo dígitos."""
     return phone.lstrip("+")
+
+
+def mask_email(email: str) -> str:
+    """juan.perez@gmail.com → ju***@gmail.com (para mostrar/loguear)."""
+    local, _, domain = email.partition("@")
+    if not domain:
+        return "***"
+    return f"{local[:2]}***@{domain}"
+
+
+def mask_destination(destination: str) -> str:
+    """Enmascara el destino de un OTP, sea email o teléfono."""
+    return mask_email(destination) if "@" in destination else mask_phone(destination)

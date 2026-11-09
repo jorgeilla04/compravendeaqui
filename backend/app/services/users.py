@@ -11,6 +11,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.core import ratelimit
 from app.core.logging import get_logger
 from app.core.phone import mask_phone
 from app.models import Listing, User
@@ -32,6 +33,7 @@ def to_me(user: User) -> MeOut:
         phone_masked=mask_phone(user.phone) if user.phone else None,
         phone_verified=user.phone_verified,
         email=user.email,
+        email_verified=user.email_verified,
         full_name=user.full_name,
         role=user.role,
         whatsapp_optin=user.whatsapp_optin,
@@ -58,16 +60,69 @@ def _ensure_unique(db: Session, user: User, field: str, value: str) -> None:
 
 
 def update_profile(db: Session, user: User, data: UserUpdateIn) -> User:
+    # Límite de cambios: evita usar el perfil para sondear qué datos existen.
+    ratelimit.enforce(
+        f"rl:profile:{user.id}",
+        20,
+        900,
+        "Hiciste muchos cambios seguidos. Probá en unos minutos.",
+    )
     changes = data.model_dump(exclude_unset=True)
     if changes.get("username"):
         _ensure_unique(db, user, "username", changes["username"])
     if changes.get("email"):
         changes["email"] = changes["email"].lower()
-        _ensure_unique(db, user, "email", changes["email"])
-        if changes["email"] != user.email:
+        if changes["email"] == user.email:
+            del changes["email"]
+        elif user.email_verified:
+            # Es con lo que ingresa: cambiarlo sin verificar el nuevo lo dejaría
+            # afuera de su cuenta.
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail=(
+                    "Tu email es con el que ingresás: por ahora no se puede cambiar"
+                ),
+            )
+        else:
+            _ensure_unique(db, user, "email", changes["email"])
             user.email_verified = False
+    if changes.get("phone") and changes["phone"] != user.phone:
+        if user.phone_verified:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail=(
+                    "Tu celular es con el que ingresás: por ahora no se puede cambiar"
+                ),
+            )
+        # Un celular verificado por otra cuenta es de su dueño: no se usa de
+        # contacto ajeno.
+        taken = db.scalar(
+            select(User.id).where(
+                User.phone == changes["phone"],
+                User.phone_verified.is_(True),
+                User.deleted_at.is_(None),
+                User.id != user.id,
+            )
+        )
+        if taken:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail=(
+                    "No podemos usar ese celular. Si es tuyo, escribinos al "
+                    "contacto que figura en Términos y lo revisamos."
+                ),
+            )
+        # Ingreso por email: es el WhatsApp de contacto, sin verificar.
+        user.phone_verified = False
     for key, value in changes.items():
-        if value is None and key in ("username", "full_name", "whatsapp_optin"):
+        if value is None and key in (
+            "username",
+            "full_name",
+            "whatsapp_optin",
+            "phone",
+        ):
+            continue
+        if key == "email" and value is None and user.email_verified:
             continue
         setattr(user, key, value)
     db.commit()

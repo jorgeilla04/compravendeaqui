@@ -1,36 +1,75 @@
 import { expect, test } from "@playwright/test";
 
-import { createListing, PNG, readOtp, signUp } from "./helpers";
+import {
+  completeProfile,
+  createListing,
+  PNG,
+  randomEmail,
+  randomPhone,
+  readMail,
+  signUp,
+} from "./helpers";
 
 test.describe("Flujos críticos del MVP", () => {
-  test("1 · alta e ingreso por OTP de WhatsApp", async ({ page, browser }) => {
-    const phone = await signUp(page, "Ana Gómez");
+  test("1 · alta por email y reingreso con el link del mail", async ({
+    page,
+    browser,
+  }) => {
+    const seller = await signUp(page, "Ana Gómez");
     await page.goto("/perfil");
-    await expect(
-      page.getByText("+54 9 264 ***-" + phone.digits.slice(-4)),
-    ).toBeVisible();
+    await expect(page.getByText(seller.email)).toBeVisible();
+    await expect(page.getByText("Verificado")).toBeVisible();
 
-    // Reingreso en otro dispositivo: ya no pide completar el perfil.
+    // Pide el código en un dispositivo y abre el link del mail en otro
+    // (el celular): entra sin escribir el código y cae directo en publicar.
     const other = await browser.newContext();
     const second = await other.newPage();
-    await second.goto("/ingresar?next=/mis-avisos");
-    await second.getByLabel("Tu celular").fill(phone.typed);
+    await second.goto("/ingresar");
+    await second.getByLabel("Tu email").fill(seller.email);
     await expect(async () => {
       await second.getByRole("button", { name: "Enviar código" }).click();
       await expect(second.getByLabel("Código de 6 números")).toBeVisible({
         timeout: 2000,
       });
     }).toPass();
-    await second
-      .getByLabel("Código de 6 números")
-      .fill(await readOtp(second.request, phone.digits));
+    const first = await readMail(second.request, seller.email);
+    expect(first.link).toContain("/ingresar/enlace?t=");
+    expect(new URL(first.link).searchParams.get("next")).toBe("/publicar");
+
+    const phoneContext = await browser.newContext();
+    const phone = await phoneContext.newPage();
+    await phone.goto(first.link);
+    await phone.getByRole("button", { name: "Entrar y publicar" }).click();
+    await expect(phone).toHaveURL(/\/publicar$/);
+    await expect(
+      phone.getByRole("heading", { level: 1, name: /Publicá/ }),
+    ).toBeVisible();
+
+    // El link es de un solo uso: el código del mismo mail ya no sirve.
+    await second.getByLabel("Código de 6 números").fill(first.code);
     await second.getByRole("button", { name: "Ingresar" }).click();
-    await expect(second).toHaveURL(/\/mis-avisos$/);
+    await expect(second.getByText(/incorrecto o venció/)).toBeVisible();
+    await phoneContext.close();
     await other.close();
+  });
+
+  test("1b · un usuario nuevo que entra por el link completa el perfil y publica", async ({
+    page,
+  }) => {
+    const email = randomEmail();
+    await page.goto("/ingresar");
+    await page.getByLabel("Tu email").fill(email);
+    await page.getByRole("button", { name: "Enviar código" }).click();
+    const { link } = await readMail(page.request, email);
+    await page.goto(link);
+    await page.getByRole("button", { name: "Entrar y publicar" }).click();
+    await completeProfile(page, "Nuevo Vendedor", randomPhone());
+    await expect(page).toHaveURL(/\/publicar$/);
   });
 
   test("2 · publicar un aviso con foto y precio en dólares", async ({
     page,
+    isMobile,
   }) => {
     await signUp(page);
     await page.goto("/publicar");
@@ -52,7 +91,11 @@ test.describe("Flujos críticos del MVP", () => {
     await page.getByLabel("Departamento").selectOption("Rawson");
     await page.getByRole("button", { name: "Siguiente" }).click();
 
-    await page.locator("input[type=file]").setInputFiles({
+    // En el celular se ofrece sacar la foto con la cámara; en la compu no.
+    const camera = page.getByText("Sacar foto");
+    if (isMobile) await expect(camera).toBeVisible();
+    else await expect(camera).toBeHidden();
+    await page.locator("#wizard-photos").setInputFiles({
       name: "cronos.png",
       mimeType: "image/png",
       buffer: PNG,

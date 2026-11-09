@@ -5,11 +5,22 @@ import * as React from "react";
 import { StepHeader } from "@/components/auth/login/step-header";
 import { Button } from "@/components/ui/button";
 import { FormMessage, TextField } from "@/components/ui/form";
+import {
+  identityBody,
+  otpRequestBody,
+} from "@/components/auth/login/identity-step";
 import { api, ApiError, errorMessage } from "@/lib/api";
-import type { AuthResponse, OtpRequestResponse } from "@/lib/types";
+import type {
+  AuthResponse,
+  LoginMethod,
+  OtpRequestResponse,
+} from "@/lib/types";
 
 interface Props {
-  phone: string;
+  method: LoginMethod;
+  /** Email o celular tal como lo escribió el usuario. */
+  value: string;
+  next: string;
   otp: OtpRequestResponse;
   onVerified: (res: AuthResponse) => void;
   onResent: (otp: OtpRequestResponse) => void;
@@ -17,6 +28,7 @@ interface Props {
 }
 
 export function channelLabel(channel: string): string {
+  if (channel === "email") return "email";
   return channel === "sms" ? "SMS" : "WhatsApp";
 }
 
@@ -31,7 +43,9 @@ function useCountdown(initial: number) {
 }
 
 export function CodeStep({
-  phone,
+  method,
+  value,
+  next,
   otp,
   onVerified,
   onResent,
@@ -61,7 +75,7 @@ export function CodeStep({
     try {
       const res = await api<AuthResponse>("/auth/otp/verify", {
         method: "POST",
-        body: { phone, code },
+        body: { ...identityBody(method, value), code },
         noRefresh: true,
       });
       onVerified(res);
@@ -78,16 +92,16 @@ export function CodeStep({
     setNotice(null);
     setResending(true);
     try {
-      const next = await api<OtpRequestResponse>("/auth/otp/request", {
+      const sent = await api<OtpRequestResponse>("/auth/otp/request", {
         method: "POST",
-        body: { phone },
+        body: otpRequestBody(method, value, next),
         noRefresh: true,
       });
-      onResent(next);
-      setSeconds(next.resend_in);
+      onResent(sent);
+      setSeconds(sent.resend_in);
       setCode("");
       setNotice(
-        `Te mandamos un código nuevo por ${channelLabel(next.channel)}.`,
+        `Te mandamos un código nuevo por ${channelLabel(sent.channel)}.`,
       );
     } catch (err) {
       if (err instanceof ApiError && err.retryAfter) setSeconds(err.retryAfter);
@@ -104,9 +118,17 @@ export function CodeStep({
       <StepHeader title="Ingresá el código">
         <p>
           Te enviamos un código por {channelLabel(otp.channel)} a{" "}
-          <strong className="font-semibold text-foreground">{otp.phone}</strong>
+          <strong className="font-semibold text-foreground">
+            {otp.destination}
+          </strong>
           .
         </p>
+        {otp.channel === "email" ? (
+          <p>
+            También podés tocar el botón del mail y entrás directo a publicar,
+            incluso desde el celular. Si no lo ves, revisá en Spam.
+          </p>
+        ) : null}
       </StepHeader>
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <TextField
@@ -161,7 +183,7 @@ export function CodeStep({
           onClick={onChangePhone}
           className="-ml-3"
         >
-          Cambiar número
+          {method === "email" ? "Cambiar email" : "Cambiar número"}
         </Button>
       </div>
     </div>

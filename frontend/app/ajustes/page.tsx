@@ -194,8 +194,8 @@ function PasswordSection({
     >
       <p className="text-base text-muted-foreground">
         {me.has_password
-          ? "Podés ingresar con tu contraseña o con el código por WhatsApp."
-          : "Es opcional: te sirve para ingresar sin esperar el código por WhatsApp."}
+          ? "Podés ingresar con tu contraseña o con el código que te mandamos."
+          : "Es opcional: te sirve para ingresar sin esperar el código."}
       </p>
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         {/* Campo oculto para que el gestor de contraseñas asocie la cuenta. */}

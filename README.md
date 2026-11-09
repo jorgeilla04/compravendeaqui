@@ -81,7 +81,8 @@ Al arrancar, el backend loguea cuáles están conectadas.
 
 | Integración | Para qué | Variables | Sin configurar |
 |-------------|----------|-----------|----------------|
-| WhatsApp Cloud API (Meta) | Enviar el código de ingreso (canal principal) | `WHATSAPP_*` | Se usa el siguiente canal |
+| Email (SMTP) | Código de ingreso + link "Entrar y publicar" (`LOGIN_METHOD=email`, el actual) | `SMTP_*`, `EMAIL_FROM` | El ingreso responde **503** |
+| WhatsApp Cloud API (Meta) | Código de ingreso por celular (`LOGIN_METHOD=phone`, oculto por ahora) | `WHATSAPP_*` | Se usa el siguiente canal |
 | Twilio SMS | Respaldo si WhatsApp falla | `TWILIO_*` | Sin ningún canal, el ingreso responde **503** |
 | S3 / MinIO / R2 | Fotos de avisos y avatares | `S3_*` | Subir fotos responde **503** |
 | DolarApi | Cotización USD/ARS para filtrar y ordenar por precio | `FX_*` | Usa la última cotización conocida |
@@ -130,9 +131,9 @@ npm run format
 ### E2E (flujos críticos) y performance
 
 Corren contra un stack aislado (base `compravende_e2e`, Redis 14, MinIO propio
-en :9100, backend en :8010, frontend en :3010). El OTP usa la integración real
-de WhatsApp Cloud API apuntada a un servidor falso de Meta
-(`e2e/fake-meta-server.mjs`) que guarda el código para que Playwright lo lea.
+en :9100, backend en :8010, frontend en :3010). El ingreso usa el envío SMTP
+real apuntado a un servidor de mail falso (`e2e/fake-smtp-server.mjs`) que
+guarda el código y el link para que Playwright los lea.
 
 ```bash
 e2e/start-stack.sh                      # en una terminal
