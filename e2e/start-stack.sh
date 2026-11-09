@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Levanta el stack de e2e: fake SMTP, MinIO, backend (:8010) y frontend (:3010).
+# Levanta el stack de e2e: fake SMTP y Mercado Pago, MinIO, backend (:8010) y frontend (:3010).
 # Uso: e2e/start-stack.sh   (Ctrl+C para cortar todo)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,6 +11,7 @@ redis-cli -n 14 flushdb >/dev/null
 
 trap 'kill 0' EXIT
 node "$ROOT/e2e/fake-smtp-server.mjs" &
+node "$ROOT/e2e/fake-mercadopago-server.mjs" &
 # S3 de e2e: MinIO si está instalado; si no (CI), moto_server (pip install "moto[server]").
 if command -v minio >/dev/null; then
   mkdir -p "$ROOT/e2e/.minio-data"
@@ -23,6 +24,7 @@ cd "$ROOT/backend"
 .venv/bin/alembic upgrade head >/dev/null
 for _ in $(seq 1 30); do curl -s -o /dev/null localhost:9100 && break; sleep 0.5; done
 .venv/bin/python -m app.scripts.setup_storage
+.venv/bin/python -m app.scripts.import_colegios "$ROOT/e2e/colegios-e2e.json"
 .venv/bin/uvicorn app.main:app --port 8010 --log-level warning &
 
 cd "$ROOT/frontend"

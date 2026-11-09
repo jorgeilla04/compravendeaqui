@@ -84,6 +84,7 @@ Al arrancar, el backend loguea cuáles están conectadas.
 | Email (SMTP) | Código de ingreso + link "Entrar y publicar" (`LOGIN_METHOD=email`, el actual) | `SMTP_*`, `EMAIL_FROM` | El ingreso responde **503** |
 | WhatsApp Cloud API (Meta) | Código de ingreso por celular (`LOGIN_METHOD=phone`, oculto por ahora) | `WHATSAPP_*` | Se usa el siguiente canal |
 | Twilio SMS | Respaldo si WhatsApp falla | `TWILIO_*` | Sin ningún canal, el ingreso responde **503** |
+| Mercado Pago (Checkout Pro) | Seña o pago total de la tienda de uniformes | `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` | Los pedidos quedan "a coordinar" y le llegan a la vendedora por mail |
 | S3 / MinIO / R2 | Fotos de avisos y avatares | `S3_*` | Subir fotos responde **503** |
 | DolarApi | Cotización USD/ARS para filtrar y ordenar por precio | `FX_*` | Usa la última cotización conocida |
 
@@ -195,3 +196,18 @@ GitHub Actions corre en cada push/PR a `main` y `develop`:
 
 Marco argentino: Ley 25.326 (Protección de Datos, AAIP) y Ley 24.240 (Defensa del
 Consumidor). El teléfono del vendedor no se expone hasta el clic de contacto.
+
+## 👕 Tienda de uniformes escolares (`/uniformes`)
+
+Colegio → prendas y talles → carrito → envío (48 hs / express 24 hs) → seña
+(10% + envío) o total → pago con Mercado Pago → aviso por mail a la vendedora.
+Los precios y montos los calcula siempre el backend; un pedido queda "pagado"
+solo después de consultar el pago a la API de Mercado Pago.
+
+- **Administrar:** `/uniformes/admin` (pedidos, colegios con escudo, precios
+  por prenda/colegio y fotos). Dar permiso: `python -m app.scripts.make_admin <email>`
+  (el usuario tiene que haber ingresado antes).
+- **Cargar colegios de una vez:** `python -m app.scripts.import_colegios colegios.json`
+  (formato en el docstring del script).
+- **Webhook de Mercado Pago:** `https://compravendeaqui.com.ar/api/v1/uniformes/webhooks/mercadopago`
+  (evento "Pagos"), con su clave secreta en `MP_WEBHOOK_SECRET`.

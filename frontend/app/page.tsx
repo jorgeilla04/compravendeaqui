@@ -39,6 +39,24 @@ export default async function HomePage() {
         </Suspense>
       </section>
 
+      <section
+        aria-labelledby="uniformes"
+        className="flex flex-col gap-3 rounded-card border border-border bg-card p-5 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="flex flex-col gap-1">
+          <h2 id="uniformes" className="font-heading text-h2 font-semibold">
+            Uniformes escolares
+          </h2>
+          <p className="text-muted-foreground">
+            El uniforme de tu colegio con envío a tu casa. Pagás una seña y el
+            resto cuando lo recibís.
+          </p>
+        </div>
+        <Button asChild variant="primary" size="lg" className="shrink-0">
+          <Link href="/uniformes">Elegir colegio</Link>
+        </Button>
+      </section>
+
       {categories && categories.length > 0 ? (
         <section aria-labelledby="rubros" className="flex flex-col gap-4">
           <h2 id="rubros" className="font-heading text-h2 font-semibold">

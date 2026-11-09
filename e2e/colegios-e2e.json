@@ -1,0 +1,16 @@
+[
+  {
+    "nombre": "Colegio Santa Rosa de Lima",
+    "departamento": "Capital",
+    "categoria": "parroquiales",
+    "color1": "#1E3A8A",
+    "color2": "#FFFFFF"
+  },
+  {
+    "nombre": "Escuela Industrial Domingo F. Sarmiento",
+    "departamento": "Capital",
+    "categoria": "preuniversitarios",
+    "color1": "#0F172A",
+    "color2": "#FACC15"
+  }
+]

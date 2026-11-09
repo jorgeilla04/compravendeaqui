@@ -22,3 +22,6 @@ export S3_PUBLIC_BASE_URL="http://localhost:9100/compravende-e2e"
 export OTP_MAX_SENDS_PER_HOUR=50
 export OTP_MAX_REQUESTS_PER_IP_HOUR=10000
 export OTP_RESEND_COOLDOWN_SECONDS=1
+# Mercado Pago contra su servidor falso (preferencia → pagar → vuelta a la tienda).
+export MP_ACCESS_TOKEN="TEST-e2e-token" MP_WEBHOOK_SECRET=""
+export MP_API_BASE_URL="http://localhost:9996"
