@@ -3,8 +3,12 @@ export E2E_DB=compravende_e2e
 export DATABASE_URL="${E2E_DATABASE_URL:-postgresql+psycopg://localhost:5432/${E2E_DB}}"
 export REDIS_URL="redis://localhost:6379/14"
 export ENVIRONMENT=test
-export CORS_ORIGINS="http://localhost:3010"
-export PUBLIC_SITE_URL="http://localhost:3010"
+# Puertos (cambialos si otro proyecto usa 8010/3010).
+export E2E_API_PORT="${E2E_API_PORT:-8010}" E2E_WEB_PORT="${E2E_WEB_PORT:-3010}"
+export E2E_API_URL="http://localhost:${E2E_API_PORT}"
+export E2E_BASE_URL="http://localhost:${E2E_WEB_PORT}"
+export CORS_ORIGINS="$E2E_BASE_URL"
+export PUBLIC_SITE_URL="$E2E_BASE_URL"
 export JWT_SECRET_KEY="e2e-only-secret-e2e-only-secret-e2e-only"
 # Ingreso por email (como en producción): envío SMTP real contra el servidor falso.
 export LOGIN_METHOD=email
@@ -22,3 +26,6 @@ export S3_PUBLIC_BASE_URL="http://localhost:9100/compravende-e2e"
 export OTP_MAX_SENDS_PER_HOUR=50
 export OTP_MAX_REQUESTS_PER_IP_HOUR=10000
 export OTP_RESEND_COOLDOWN_SECONDS=1
+# Mercado Pago contra su servidor falso (preferencia → pagar → vuelta a la tienda).
+export MP_ACCESS_TOKEN="TEST-e2e-token" MP_WEBHOOK_SECRET=""
+export MP_API_BASE_URL="http://localhost:9996"

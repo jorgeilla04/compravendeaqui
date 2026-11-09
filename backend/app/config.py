@@ -114,6 +114,16 @@ class Settings(BaseSettings):
     # Adónde lleva el link del mail si el usuario no venía de otra página.
     email_link_default_next: str = "/publicar"
 
+    # --- Mercado Pago (Checkout Pro) ---
+    # El Access Token vive solo en el backend; nunca llega al navegador.
+    mp_access_token: str = ""
+    # Clave secreta de las notificaciones (Tus integraciones → Webhooks):
+    # si está, se valida la firma x-signature de cada aviso.
+    mp_webhook_secret: str = ""
+    mp_api_base_url: str = "https://api.mercadopago.com"
+    # Texto que ve el comprador en el resumen de la tarjeta (máx. 22).
+    mp_statement_descriptor: str = "COMPRAVENDEAQUI"
+
     # --- Cotización USD/ARS ---
     fx_api_url: str = "https://dolarapi.com/v1/dolares/blue"
     # Campo del JSON que se usa como cotización ("venta" o "compra").
@@ -152,6 +162,11 @@ class Settings(BaseSettings):
             )
         if self.is_production and not self.cookie_secure:
             raise ValueError("COOKIE_SECURE=true es obligatorio en producción")
+        if self.is_production and self.mp_access_token and not self.mp_webhook_secret:
+            raise ValueError(
+                "MP_WEBHOOK_SECRET es obligatorio en producción si MP_ACCESS_TOKEN "
+                "está configurado (Mercado Pago → Tus integraciones → Webhooks)"
+            )
         return self
 
     @property
@@ -183,6 +198,10 @@ class Settings(BaseSettings):
     @property
     def email_configured(self) -> bool:
         return bool(self.smtp_host and self.email_from)
+
+    @property
+    def mp_configured(self) -> bool:
+        return bool(self.mp_access_token)
 
     @property
     def s3_configured(self) -> bool:

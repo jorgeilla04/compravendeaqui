@@ -135,3 +135,17 @@ describe("sesión", () => {
     expect(() => render(<WhoAmI />)).toThrow(/AuthProvider/);
   });
 });
+
+describe("buildUrl", () => {
+  it("rechaza rutas que intentan salir del endpoint", () => {
+    const { buildUrl } = jest.requireActual("@/lib/api");
+    expect(() => buildUrl("/tiendas/pedidos/../../users/me")).toThrow(
+      "Dirección inválida",
+    );
+    expect(() => buildUrl("/tiendas/pedidos/%2e%2E/admin")).toThrow();
+    expect(() => buildUrl("/tiendas//x")).toThrow();
+    expect(buildUrl("/tiendas/pedidos/abc", { payment_id: "1" })).toMatch(
+      /\/api\/v1\/tiendas\/pedidos\/abc\?payment_id=1$/,
+    );
+  });
+});

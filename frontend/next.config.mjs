@@ -23,6 +23,21 @@ const nextConfig = {
       },
     ],
   },
+  // La tienda de uniformes vivía en /uniformes antes de que hubiera varias.
+  async redirects() {
+    return [
+      {
+        source: "/uniformes/pedido/:id",
+        destination: "/tiendas/pedido/:id",
+        permanent: true,
+      },
+      {
+        source: "/uniformes/:path*",
+        destination: "/tiendas/uniformes/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

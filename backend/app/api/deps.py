@@ -69,6 +69,16 @@ def get_complete_user(user: CurrentUser) -> User:
 
 
 CompleteUser = Annotated[User, Depends(get_complete_user)]
+
+
+def get_admin_user(user: CompleteUser) -> User:
+    """Administrador del sitio (crea tiendas y asigna encargados)."""
+    if user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Solo administradores")
+    return user
+
+
+AdminUser = Annotated[User, Depends(get_admin_user)]
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 
 
