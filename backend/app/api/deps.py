@@ -72,7 +72,7 @@ CompleteUser = Annotated[User, Depends(get_complete_user)]
 
 
 def get_admin_user(user: CompleteUser) -> User:
-    """Administración (por ahora, la tienda de uniformes)."""
+    """Administrador del sitio (crea tiendas y asigna encargados)."""
     if user.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Solo administradores")
     return user

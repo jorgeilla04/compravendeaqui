@@ -49,7 +49,7 @@ def preference_payload(
     config: Settings = settings,
 ) -> dict[str, Any]:
     site = config.public_site_url.rstrip("/")
-    back = f"{site}/uniformes/pedido/{pedido_id}"
+    back = f"{site}/tiendas/pedido/{pedido_id}"
     payload: dict[str, Any] = {
         "items": [
             {
@@ -72,7 +72,7 @@ def preference_payload(
     # Mercado Pago solo avisa a URLs públicas por HTTPS.
     if site.startswith("https://"):
         payload["notification_url"] = (
-            f"{site}/api/v1/uniformes/webhooks/mercadopago?source_news=webhooks"
+            f"{site}/api/v1/tiendas/webhooks/mercadopago?source_news=webhooks"
         )
     return payload
 

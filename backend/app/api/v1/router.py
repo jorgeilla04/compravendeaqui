@@ -8,8 +8,8 @@ from app.api.v1.endpoints import (
     listings,
     search,
     seo,
-    uniformes,
-    uniformes_admin,
+    tiendas,
+    tiendas_admin,
     users,
 )
 
@@ -21,5 +21,5 @@ api_router.include_router(search.router)
 api_router.include_router(listings.router)
 api_router.include_router(users.router)
 api_router.include_router(seo.router)
-api_router.include_router(uniformes.router)
-api_router.include_router(uniformes_admin.router)
+api_router.include_router(tiendas.router)
+api_router.include_router(tiendas_admin.router)

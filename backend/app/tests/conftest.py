@@ -84,18 +84,41 @@ def _clean_state() -> Iterator[None]:
         conn.execute(
             text(
                 "TRUNCATE listing_images, listings, refresh_tokens, otp_codes, users, "
-                "uniformes_pedido_items, uniformes_pedidos, uniformes_precios, "
-                "uniformes_colegios RESTART IDENTITY CASCADE"
+                "tienda_pedido_items, tienda_pedidos, tienda_precios, "
+                "tienda_grupos, tienda_admins RESTART IDENTITY CASCADE"
             )
         )
-        # Las prendas vienen de la migración: se restauran, no se borran.
+        # La tienda de uniformes y sus prendas vienen de la migración: se
+        # restauran (los tests las editan) y se borran las tiendas creadas.
+        conn.execute(text("DELETE FROM tiendas WHERE slug <> 'uniformes'"))
         conn.execute(
             text(
-                "UPDATE uniformes_prendas SET precio_base = 10000, activo = true, "
+                "DELETE FROM tienda_productos WHERE slug NOT IN ('remera', "
+                "'pantalon', 'pollera', 'corbata', 'buzo', 'campera', 'bermuda', "
+                "'jogging')"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE tienda_productos SET precio_base = 10000, activo = true, "
                 "foto_url = NULL"
             )
         )
+        conn.execute(text(RESET_UNIFORMES))
     get_redis().flushdb()
+
+
+RESET_UNIFORMES = """
+UPDATE tiendas SET nombre = 'Uniformes escolares', activo = true,
+  envio_habilitado = true, envio_monto = 5000, envio_gratis_desde = NULL,
+  envio_demora = '48 hs', express_habilitado = true, express_recargo_pct = 20,
+  express_monto = 0, express_demora = '24 hs', retiro_habilitado = false,
+  sena_habilitada = true, sena_pct = 10, total_habilitado = true,
+  productos_en_todos = true, vendedor_email = 'virginialauratello@gmail.com',
+  departamentos_envio = '["Capital", "Chimbas", "Pocito", "Rawson",
+    "Rivadavia", "Santa Lucía"]'
+WHERE slug = 'uniformes'
+"""
 
 
 class RecordingSender:

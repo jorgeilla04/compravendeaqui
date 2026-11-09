@@ -114,18 +114,6 @@ class Settings(BaseSettings):
     # Adónde lleva el link del mail si el usuario no venía de otra página.
     email_link_default_next: str = "/publicar"
 
-    # --- Tienda de uniformes ---
-    # Envío en el Gran San Juan (48 hs) y recargo del express (24 hs) sobre
-    # el valor de los uniformes.
-    uniformes_envio_monto: int = 5000
-    uniformes_express_recargo_pct: int = 20
-    # Seña: % del valor de los uniformes, más el envío (y el express).
-    uniformes_sena_pct: int = 10
-    uniformes_vendedora_nombre: str = "Virginia Tello"
-    uniformes_vendedora_email: str = "virginialauratello@gmail.com"
-    uniformes_vendedora_whatsapp: str = "+5492645408193"
-    uniformes_retiro_direccion: str = "Santiago del Estero Sur 1131, Capital"
-
     # --- Mercado Pago (Checkout Pro) ---
     # El Access Token vive solo en el backend; nunca llega al navegador.
     mp_access_token: str = ""
