@@ -105,9 +105,12 @@ class EmailOtpSender:
                     smtp.login(c.smtp_username, c.smtp_password)
                 refused = smtp.send_message(msg)
         except (smtplib.SMTPException, OSError) as exc:
-            raise OtpDeliveryError(f"email: {type(exc).__name__} ({exc})") from exc
+            # Sin str(exc): algunos errores SMTP incluyen las direcciones.
+            err = getattr(exc, "smtp_code", None) or getattr(exc, "errno", None)
+            raise OtpDeliveryError(f"email: {type(exc).__name__} code={err}") from exc
         if refused:
-            raise OtpDeliveryError(f"email: destinatario rechazado {refused}")
+            codes = {mask_destination(addr): err[0] for addr, err in refused.items()}
+            raise OtpDeliveryError(f"email: destinatario rechazado {codes}")
         return str(msg["Message-ID"])
 
 

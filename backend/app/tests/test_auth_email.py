@@ -265,3 +265,25 @@ def test_invalid_email_message_is_in_spanish(client: TestClient) -> None:
     response = client.post("/api/v1/auth/otp/request", json={"email": "juan@gmail"})
     assert response.status_code == 422
     assert "Revisá el email" in response.json()["detail"][0]["msg"]
+
+
+def test_phone_verified_by_another_account_cannot_be_used(
+    client: TestClient,
+    otp_sender: RecordingSender,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "login_method", "phone")
+    owner = TestClient(client.app, headers=dict(client.headers))
+    login(owner, otp_sender, "2644777666")
+
+    monkeypatch.setattr(settings, "login_method", "email")
+    client.post("/api/v1/auth/otp/request", json={"email": EMAIL})
+    client.post(
+        "/api/v1/auth/otp/verify", json={"email": EMAIL, "code": otp_sender.last_code()}
+    )
+    taken = _register(client, phone="264 477-7666")
+    assert taken.status_code == 409
+    assert taken.json()["detail"] == "Ese celular ya está en uso"
+    assert _register(client, phone="264 477-7667").status_code == 200
+    again = client.put("/api/v1/users/me", json={"phone": "2644777666"})
+    assert again.status_code == 409

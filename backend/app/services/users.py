@@ -86,6 +86,20 @@ def update_profile(db: Session, user: User, data: UserUpdateIn) -> User:
                     "Tu celular es con el que ingresás: por ahora no se puede cambiar"
                 ),
             )
+        # Un celular verificado por otra cuenta es de su dueño: no se usa de
+        # contacto ajeno.
+        taken = db.scalar(
+            select(User.id).where(
+                User.phone == changes["phone"],
+                User.phone_verified.is_(True),
+                User.deleted_at.is_(None),
+                User.id != user.id,
+            )
+        )
+        if taken:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, detail="Ese celular ya está en uso"
+            )
         # Ingreso por email: es el WhatsApp de contacto, sin verificar.
         user.phone_verified = False
     for key, value in changes.items():

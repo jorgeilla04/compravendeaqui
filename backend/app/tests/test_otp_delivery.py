@@ -279,13 +279,22 @@ def test_email_errors_become_delivery_errors(fake_smtp: type[FakeSMTP]) -> None:
     fake_smtp.fail = smtplib.SMTPAuthenticationError(535, b"bad credentials")
     with pytest.raises(OtpDeliveryError, match="SMTPAuthenticationError"):
         sender.send("juan@gmail.com", "111222", LINK)
-    fake_smtp.fail = OSError("connection refused")
-    with pytest.raises(OtpDeliveryError, match="connection refused"):
+    fake_smtp.fail = ConnectionRefusedError(61, "connection refused")
+    with pytest.raises(OtpDeliveryError, match="ConnectionRefusedError code=61"):
         sender.send("juan@gmail.com", "111222", LINK)
+    fake_smtp.fail = smtplib.SMTPRecipientsRefused(
+        {"juan@gmail.com": (550, b"no such user")}
+    )
+    with pytest.raises(OtpDeliveryError) as refused_exc:
+        sender.send("juan@gmail.com", "111222", LINK)
+    # Los logs nunca llevan el email completo.
+    assert "juan@gmail.com" not in str(refused_exc.value)
     fake_smtp.fail = None
     fake_smtp.refuse = {"juan@gmail.com": (550, b"no such user")}
-    with pytest.raises(OtpDeliveryError, match="rechazado"):
+    with pytest.raises(OtpDeliveryError, match="rechazado") as partial:
         sender.send("juan@gmail.com", "111222", LINK)
+    assert "ju***@gmail.com" in str(partial.value)
+    assert "juan@gmail.com" not in str(partial.value)
 
 
 def test_configured_senders_follow_login_method() -> None:
