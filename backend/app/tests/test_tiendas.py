@@ -69,7 +69,7 @@ def _admin_of(
     db.execute(
         update(User)
         .where(User.username == data["user"]["username"])
-        .values(role=role, email=email)
+        .values(role=role, email=email, email_verified=True)
     )
     db.commit()
     return client, email
@@ -686,8 +686,23 @@ def test_crear_tienda_y_asignar_encargado(
     assert publica["modalidades"] == ["total"]
     assert publica["retiro_direccion"] == "Mitre 100 (E), Capital"
 
-    admin.delete(f"{ADMIN}/libreria-el-estudiante/encargados/{email}")
+    user_id = admin.get(f"{ADMIN}/libreria-el-estudiante/encargados").json()[0]["id"]
+    quitado = admin.delete(f"{ADMIN}/libreria-el-estudiante/encargados/{user_id}")
+    assert quitado.status_code == 204
     assert encargado.get(ADMIN).json() == []
+    otra_vez = admin.delete(f"{ADMIN}/libreria-el-estudiante/encargados/{user_id}")
+    assert otra_vez.status_code == 404
+
+
+def test_encargado_solo_con_email_verificado(
+    admin: TestClient, make_user: MakeUser, db: Any
+) -> None:
+    """Un email cargado sin verificar en un perfil no da permisos de encargado."""
+    _, email = _admin_of(make_user, db, role="user")
+    db.execute(update(User).where(User.email == email).values(email_verified=False))
+    db.commit()
+    response = admin.post(f"{ADMIN}/uniformes/encargados", json={"email": email})
+    assert response.status_code == 404
 
 
 def test_el_dueno_configura_envio_express_retiro_y_pagos(

@@ -306,6 +306,7 @@ class EncargadoIn(BaseModel):
 
 
 class EncargadoOut(BaseModel):
+    id: uuid.UUID
     email: str | None
     nombre: str
 

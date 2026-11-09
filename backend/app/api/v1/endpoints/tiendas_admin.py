@@ -130,7 +130,7 @@ def encargados(slug: str, _: AdminUser, db: DbSession) -> list[EncargadoOut]:
         .where(TiendaAdmin.tienda_id == tienda.id)
         .order_by(User.email)
     )
-    return [EncargadoOut(email=u.email, nombre=u.display_name) for u in users]
+    return [EncargadoOut(id=u.id, email=u.email, nombre=u.display_name) for u in users]
 
 
 @router.post(
@@ -142,14 +142,21 @@ def agregar_encargado(
     slug: str, body: EncargadoIn, _: AdminUser, db: DbSession
 ) -> EncargadoOut:
     tienda = service.get_tienda(db, slug, include_inactive=True)
+    # Solo un email verificado identifica a alguien: uno cargado en un perfil
+    # sin verificar no da permisos sobre la tienda.
     user = db.scalars(
-        select(User).where(User.email == body.email, User.deleted_at.is_(None))
+        select(User).where(
+            User.email == body.email,
+            User.email_verified.is_(True),
+            User.deleted_at.is_(None),
+        )
     ).first()
     if user is None:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
             detail=(
-                "No hay ninguna cuenta con ese email: tiene que ingresar una vez antes"
+                "No hay ninguna cuenta con ese email: tiene que ingresar con él "
+                "una vez antes"
             ),
         )
     exists = db.scalar(
@@ -160,23 +167,30 @@ def agregar_encargado(
     if not exists:
         db.add(TiendaAdmin(tienda_id=tienda.id, user_id=user.id))
         db.commit()
-    return EncargadoOut(email=user.email, nombre=user.display_name)
+    return EncargadoOut(id=user.id, email=user.email, nombre=user.display_name)
 
 
 @router.delete(
-    "/{slug}/encargados/{email}",
+    "/{slug}/encargados/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
     response_model=None,
 )
-def quitar_encargado(slug: str, email: str, _: AdminUser, db: DbSession) -> Response:
+def quitar_encargado(
+    slug: str, user_id: uuid.UUID, _: AdminUser, db: DbSession
+) -> Response:
+    """Se quita por el id de la cuenta (estable), no por un email."""
     tienda = service.get_tienda(db, slug, include_inactive=True)
-    user_ids = select(User.id).where(User.email == email.lower())
-    db.execute(
+    result = db.execute(
         delete(TiendaAdmin).where(
-            TiendaAdmin.tienda_id == tienda.id, TiendaAdmin.user_id.in_(user_ids)
+            TiendaAdmin.tienda_id == tienda.id, TiendaAdmin.user_id == user_id
         )
     )
+    if not result.rowcount:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, detail="Esa persona no es encargada de la tienda"
+        )
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
