@@ -44,6 +44,7 @@ export interface Me extends PublicUser {
   phone_masked: string | null;
   phone_verified: boolean;
   email: string | null;
+  email_verified: boolean;
   full_name: string | null;
   role: string;
   whatsapp_optin: boolean;
@@ -117,8 +118,12 @@ export interface AuthResponse {
   expires_in: number;
 }
 
+/** Con qué se ingresa (lo decide la API: GET /auth/methods). */
+export type LoginMethod = "email" | "phone";
+
 export interface OtpRequestResponse {
-  phone: string;
+  /** Email o celular enmascarado. */
+  destination: string;
   channel: string;
   expires_in: number;
   resend_in: number;

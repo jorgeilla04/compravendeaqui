@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Levanta el stack de e2e: fake Meta, MinIO, backend (:8010) y frontend (:3010).
+# Levanta el stack de e2e: fake SMTP, MinIO, backend (:8010) y frontend (:3010).
 # Uso: e2e/start-stack.sh   (Ctrl+C para cortar todo)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,7 +10,7 @@ psql -d "$E2E_DB" -qc "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 redis-cli -n 14 flushdb >/dev/null
 
 trap 'kill 0' EXIT
-node "$ROOT/e2e/fake-meta-server.mjs" &
+node "$ROOT/e2e/fake-smtp-server.mjs" &
 # S3 de e2e: MinIO si está instalado; si no (CI), moto_server (pip install "moto[server]").
 if command -v minio >/dev/null; then
   mkdir -p "$ROOT/e2e/.minio-data"

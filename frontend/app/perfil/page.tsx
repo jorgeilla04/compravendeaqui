@@ -22,7 +22,9 @@ export default function PerfilPage() {
   );
 }
 
-type Errors = Partial<Record<"username" | "full_name" | "email", string>>;
+type Errors = Partial<
+  Record<"username" | "full_name" | "email" | "phone", string>
+>;
 
 function ProfileEditor() {
   const { user, setUser } = useAuth();
@@ -162,6 +164,9 @@ function DetailsForm({ me, onSaved }: { me: Me; onSaved: (me: Me) => void }) {
   const [fullName, setFullName] = React.useState(me.full_name ?? "");
   const [username, setUsername] = React.useState(me.username);
   const [email, setEmail] = React.useState(me.email ?? "");
+  const [phone, setPhone] = React.useState("");
+  // Con lo que se ingresa no se edita acá; el otro dato sí.
+  const loginByEmail = me.email_verified && !me.phone_verified;
   const [errors, setErrors] = React.useState<Errors>({});
   const [message, setMessage] = React.useState<{
     tone: "error" | "success";
@@ -178,8 +183,16 @@ function DetailsForm({ me, onSaved }: { me: Me; onSaved: (me: Me) => void }) {
       found.username =
         "Usá entre 3 y 30 caracteres: letras minúsculas, números, _ o punto.";
     }
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (
+      !loginByEmail &&
+      email.trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+    ) {
       found.email = "Revisá el email, parece que le falta algo.";
+    }
+    if (loginByEmail && phone.trim() && phone.replace(/\D/g, "").length < 10) {
+      found.phone =
+        "Ingresá tu celular con característica, por ejemplo 264 412-3456.";
     }
     setErrors(found);
     setMessage(null);
@@ -191,10 +204,15 @@ function DetailsForm({ me, onSaved }: { me: Me; onSaved: (me: Me) => void }) {
         body: {
           full_name: fullName.trim(),
           username,
-          email: email.trim() || null,
+          ...(loginByEmail
+            ? phone.trim()
+              ? { phone: phone.trim() }
+              : {}
+            : { email: email.trim() || null }),
         },
       });
       onSaved(updated);
+      setPhone("");
       setMessage({ tone: "success", text: "Guardamos los cambios." });
     } catch (err) {
       setMessage({ tone: "error", text: errorMessage(err) });
@@ -209,10 +227,14 @@ function DetailsForm({ me, onSaved }: { me: Me; onSaved: (me: Me) => void }) {
         Tus datos
       </h2>
       <dl className="flex flex-col gap-1.5">
-        <dt className="text-meta font-semibold text-foreground">Celular</dt>
+        <dt className="text-meta font-semibold text-foreground">
+          {loginByEmail ? "Email" : "Celular"}
+        </dt>
         <dd className="flex flex-wrap items-center gap-2 text-base">
-          <span>{me.phone_masked ?? "Sin celular"}</span>
-          {me.phone_verified ? (
+          <span>
+            {loginByEmail ? me.email : (me.phone_masked ?? "Sin celular")}
+          </span>
+          {loginByEmail || me.phone_verified ? (
             <Badge tone="success">
               <BadgeCheck aria-hidden="true" className="size-4" />
               Verificado
@@ -249,19 +271,40 @@ function DetailsForm({ me, onSaved }: { me: Me; onSaved: (me: Me) => void }) {
           disabled={saving}
           required
         />
-        <TextField
-          id="email"
-          label="Email"
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          optional
-          hint="Solo para avisos de tu cuenta. No lo mostramos."
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-          disabled={saving}
-        />
+        {loginByEmail ? (
+          <TextField
+            id="phone"
+            label="Celular (WhatsApp)"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel-national"
+            placeholder="264 412-3456"
+            optional
+            hint={
+              me.phone_masked
+                ? `Ahora: ${me.phone_masked}. Escribí otro solo si querés cambiarlo.`
+                : "Por acá te escriben los compradores. No se muestra en el aviso."
+            }
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            error={errors.phone}
+            disabled={saving}
+          />
+        ) : (
+          <TextField
+            id="email"
+            label="Email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            optional
+            hint="Solo para avisos de tu cuenta. No lo mostramos."
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={errors.email}
+            disabled={saving}
+          />
+        )}
         {message ? (
           <FormMessage tone={message.tone}>{message.text}</FormMessage>
         ) : null}

@@ -20,6 +20,8 @@ os.environ["BCRYPT_ROUNDS"] = "4"
 os.environ["CORS_ORIGINS"] = "http://localhost:3000"
 os.environ["TRUSTED_PROXIES"] = "testclient"
 os.environ["PUBLIC_SITE_URL"] = "https://compravendeaqui.test"
+# Los tests existentes ingresan por celular; los de email lo cambian por test.
+os.environ["LOGIN_METHOD"] = "phone"
 for _secret in (
     "WHATSAPP_PHONE_NUMBER_ID",
     "WHATSAPP_ACCESS_TOKEN",
@@ -28,6 +30,8 @@ for _secret in (
     "TWILIO_AUTH_TOKEN",
     "TWILIO_FROM_NUMBER",
     "TWILIO_MESSAGING_SERVICE_SID",
+    "SMTP_HOST",
+    "EMAIL_FROM",
 ):
     os.environ[_secret] = ""
 os.environ["S3_ACCESS_KEY_ID"] = "test"
@@ -91,13 +95,18 @@ class RecordingSender:
 
     def __init__(self) -> None:
         self.sent: list[tuple[str, str]] = []
+        self.links: list[str | None] = []
 
-    def send(self, phone: str, code: str) -> str:
-        self.sent.append((phone, code))
+    def send(self, destination: str, code: str, link: str | None = None) -> str:
+        self.sent.append((destination, code))
+        self.links.append(link)
         return f"wamid.{len(self.sent)}"
 
     def last_code(self) -> str:
         return self.sent[-1][1]
+
+    def last_link(self) -> str | None:
+        return self.links[-1]
 
 
 @pytest.fixture

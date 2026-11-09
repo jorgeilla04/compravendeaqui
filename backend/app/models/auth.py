@@ -5,7 +5,17 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Uuid, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Uuid,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, UUIDPrimaryKeyMixin
@@ -13,11 +23,22 @@ from app.models.base import Base, UUIDPrimaryKeyMixin
 
 class OtpCode(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "otp_codes"
-    __table_args__ = (Index("idx_otp_phone", "phone", "purpose"),)
+    __table_args__ = (
+        Index("idx_otp_destination", "destination", "purpose"),
+        Index(
+            "uq_otp_codes_link_hash",
+            "link_hash",
+            unique=True,
+            postgresql_where=text("link_hash IS NOT NULL"),
+        ),
+    )
 
-    phone: Mapped[str] = mapped_column(String(20))
+    # Teléfono (+549...) o email (en minúsculas) al que se mandó el código.
+    destination: Mapped[str] = mapped_column(String(255))
     # HMAC del código: nunca se guarda en claro.
     code_hash: Mapped[str] = mapped_column(String(255))
+    # HMAC del token del link "Entrar" que va en el mail (solo canal email).
+    link_hash: Mapped[str | None] = mapped_column(String(255))
     purpose: Mapped[str] = mapped_column(String(20))  # 'login' | 'contact'
     channel: Mapped[str | None] = mapped_column(String(20))
     attempts: Mapped[int] = mapped_column(Integer, default=0)

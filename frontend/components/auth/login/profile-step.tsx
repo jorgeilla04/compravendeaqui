@@ -13,6 +13,7 @@ export interface ProfileValues {
   username: string;
   full_name: string;
   email: string;
+  phone: string;
   password: string;
   accept_terms: boolean;
   whatsapp_optin: boolean;
@@ -22,8 +23,14 @@ type Errors = Partial<Record<keyof ProfileValues, string>>;
 
 export const USERNAME_RE = /^[a-z0-9_.]{3,30}$/;
 
-/** Validación en el cliente, espejo de RegisterIn (backend). */
-export function validateProfile(values: ProfileValues): Errors {
+/**
+ * Validación en el cliente, espejo de RegisterIn (backend). `needsPhone`: se
+ * ingresó por email y todavía no hay WhatsApp de contacto.
+ */
+export function validateProfile(
+  values: ProfileValues,
+  needsPhone = false,
+): Errors {
   const errors: Errors = {};
   if (!USERNAME_RE.test(values.username)) {
     errors.username =
@@ -38,6 +45,10 @@ export function validateProfile(values: ProfileValues): Errors {
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())
   ) {
     errors.email = "Revisá el email, parece que le falta algo.";
+  }
+  if (needsPhone && values.phone.replace(/\D/g, "").length < 10) {
+    errors.phone =
+      "Ingresá tu celular con característica, por ejemplo 264 412-3456.";
   }
   if (values.password && values.password.length < 8) {
     errors.password = "La contraseña tiene que tener al menos 8 caracteres.";
@@ -69,10 +80,14 @@ export function ProfileStep({
     username: suggestUsername(user),
     full_name: user?.full_name ?? "",
     email: user?.email ?? "",
+    phone: "",
     password: "",
     accept_terms: false,
     whatsapp_optin: true,
   });
+  // Ingreso por email: falta el WhatsApp de contacto y el email ya está.
+  const needsPhone = !user?.phone_masked;
+  const emailFromLogin = Boolean(user?.email_verified);
   const [errors, setErrors] = React.useState<Errors>({});
   const [serverError, setServerError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -83,7 +98,7 @@ export function ProfileStep({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const found = validateProfile(values);
+    const found = validateProfile(values, needsPhone);
     setErrors(found);
     setServerError(null);
     if (Object.keys(found).length > 0) return;
@@ -94,7 +109,8 @@ export function ProfileStep({
         body: {
           username: values.username,
           full_name: values.full_name.trim(),
-          email: values.email.trim() || null,
+          ...(emailFromLogin ? {} : { email: values.email.trim() || null }),
+          ...(needsPhone ? { phone: values.phone.trim() } : {}),
           password: values.password || null,
           accept_terms: values.accept_terms,
           whatsapp_optin: values.whatsapp_optin,
@@ -140,20 +156,39 @@ export function ProfileStep({
           disabled={saving}
           required
         />
-        <TextField
-          id="email"
-          name="email"
-          label="Email"
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          optional
-          hint="Solo para avisos de tu cuenta. No lo mostramos."
-          value={values.email}
-          onChange={(e) => set("email", e.target.value)}
-          error={errors.email}
-          disabled={saving}
-        />
+        {needsPhone ? (
+          <TextField
+            id="phone"
+            name="phone"
+            label="Tu celular (WhatsApp)"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel-national"
+            placeholder="264 412-3456"
+            hint="Por acá te escriben los compradores. No se muestra en el aviso."
+            value={values.phone}
+            onChange={(e) => set("phone", e.target.value)}
+            error={errors.phone}
+            disabled={saving}
+            required
+          />
+        ) : null}
+        {emailFromLogin ? null : (
+          <TextField
+            id="email"
+            name="email"
+            label="Email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            optional
+            hint="Solo para avisos de tu cuenta. No lo mostramos."
+            value={values.email}
+            onChange={(e) => set("email", e.target.value)}
+            error={errors.email}
+            disabled={saving}
+          />
+        )}
         <TextField
           id="new-password"
           name="password"

@@ -1,10 +1,11 @@
-"""Lógica de autenticación: OTP telefónico, password opcional y sesiones."""
+"""Lógica de autenticación: OTP (email o teléfono), password opcional y sesiones."""
 
 from __future__ import annotations
 
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlencode
 
 from fastapi import HTTPException, status
 from sqlalchemy import select, update
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core import ratelimit
 from app.core.logging import get_logger
-from app.core.phone import mask_phone
+from app.core.phone import mask_destination
 from app.core.redis import get_redis
 from app.core.security import (
     constant_time_equals,
@@ -31,26 +32,47 @@ log = get_logger(__name__)
 
 OTP_PURPOSE_LOGIN = "login"
 INVALID_CREDENTIALS = "Teléfono o contraseña incorrectos"
+INVALID_EMAIL_CREDENTIALS = "Email o contraseña incorrectos"
 
 
 def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _otp_hash(phone: str, code: str) -> str:
-    return hmac_digest(f"otp:{phone}:{code}")
+def _otp_hash(destination: str, code: str) -> str:
+    return hmac_digest(f"otp:{destination}:{code}")
 
 
-def _otp_lockout(phone: str) -> ratelimit.Lockout:
+def _link_hash(token: str) -> str:
+    return hmac_digest(f"otplink:{token}")
+
+
+def _is_email(destination: str) -> bool:
+    return "@" in destination
+
+
+def _otp_lockout(destination: str) -> ratelimit.Lockout:
     return ratelimit.Lockout(
-        "otp", phone, settings.auth_max_attempts, settings.auth_lock_minutes
+        "otp", destination, settings.auth_max_attempts, settings.auth_lock_minutes
     )
 
 
-def _password_lockout(phone: str) -> ratelimit.Lockout:
+def _password_lockout(identifier: str) -> ratelimit.Lockout:
     return ratelimit.Lockout(
-        "pwd", phone, settings.auth_max_attempts, settings.auth_lock_minutes
+        "pwd", identifier, settings.auth_max_attempts, settings.auth_lock_minutes
     )
+
+
+def safe_next(path: str | None) -> str:
+    """Ruta interna a la que lleva el link del mail (nunca a otro sitio)."""
+    if path and path.startswith("/") and not path.startswith(("//", "/\\")):
+        return path[:300]
+    return settings.email_link_default_next
+
+
+def login_link(token: str, next_path: str | None) -> str:
+    query = urlencode({"t": token, "next": safe_next(next_path)})
+    return f"{settings.public_site_url.rstrip('/')}/ingresar/enlace?{query}"
 
 
 # --- OTP -------------------------------------------------------------------
@@ -64,18 +86,23 @@ class OtpRequestResult:
 
 
 def request_otp(
-    db: Session, dispatcher: OtpDispatcher, phone: str, ip: str
+    db: Session,
+    dispatcher: OtpDispatcher,
+    destination: str,
+    ip: str,
+    next_path: str | None = None,
 ) -> OtpRequestResult:
-    _otp_lockout(phone).ensure_not_locked()
+    """Manda un código al teléfono o email. Por email va también un link de entrada."""
+    _otp_lockout(destination).ensure_not_locked()
 
-    # Límites de reenvío: por IP (anti-abuso de costo) y por teléfono.
+    # Límites de reenvío: por IP (anti-abuso de costo) y por destino.
     ratelimit.enforce(
         f"rl:otp:ip:{ip}",
         settings.otp_max_requests_per_ip_hour,
         3600,
         "Demasiadas solicitudes. Probá más tarde.",
     )
-    cooldown_key = f"otp:cooldown:{phone}"
+    cooldown_key = f"otp:cooldown:{destination}"
     r = get_redis()
     if not r.set(cooldown_key, "1", ex=settings.otp_resend_cooldown_seconds, nx=True):
         wait = max(int(r.ttl(cooldown_key)), 1)
@@ -86,7 +113,7 @@ def request_otp(
         )
     try:
         ratelimit.enforce(
-            f"rl:otp:phone:{phone}",
+            f"rl:otp:destination:{destination}",
             settings.otp_max_sends_per_hour,
             3600,
             "Pediste demasiados códigos. Probá de nuevo en una hora.",
@@ -95,34 +122,38 @@ def request_otp(
         r.delete(cooldown_key)
         raise
 
-    # Un solo código vigente por teléfono: invalida los anteriores.
+    # Un solo código vigente por destino: invalida los anteriores.
     db.execute(
         update(OtpCode)
         .where(
-            OtpCode.phone == phone,
+            OtpCode.destination == destination,
             OtpCode.purpose == OTP_PURPOSE_LOGIN,
             OtpCode.consumed.is_(False),
         )
         .values(consumed=True)
     )
     code = generate_otp()
+    token = secrets.token_urlsafe(32) if _is_email(destination) else None
     otp = OtpCode(
-        phone=phone,
-        code_hash=_otp_hash(phone, code),
+        destination=destination,
+        code_hash=_otp_hash(destination, code),
+        link_hash=_link_hash(token) if token else None,
         purpose=OTP_PURPOSE_LOGIN,
         attempts=0,
         consumed=False,
-        expires_at=_now() + timedelta(minutes=settings.otp_ttl_minutes),
+        expires_at=_now() + timedelta(minutes=settings.otp_ttl_for(destination)),
     )
     db.add(otp)
     db.flush()
 
     try:
-        otp.channel = dispatcher.send(phone, code)
+        otp.channel = dispatcher.send(
+            destination, code, login_link(token, next_path) if token else None
+        )
     except OtpDeliveryUnavailable as exc:
         db.rollback()
         r.delete(cooldown_key)
-        log.error("otp.unavailable", phone=mask_phone(phone), error=str(exc))
+        log.error("otp.unavailable", to=mask_destination(destination), error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
@@ -133,20 +164,20 @@ def request_otp(
     db.commit()
     return OtpRequestResult(
         channel=otp.channel or "",
-        expires_in=settings.otp_ttl_minutes * 60,
+        expires_in=settings.otp_ttl_for(destination) * 60,
         resend_in=settings.otp_resend_cooldown_seconds,
     )
 
 
-def verify_otp(db: Session, phone: str, code: str) -> tuple[User, bool]:
-    """Valida el código. Devuelve (usuario, es_nuevo)."""
-    lockout = _otp_lockout(phone)
+def verify_otp(db: Session, destination: str, code: str) -> tuple[User, bool]:
+    """Valida el código del teléfono o email. Devuelve (usuario, es_nuevo)."""
+    lockout = _otp_lockout(destination)
     lockout.ensure_not_locked()
 
     otp = db.scalars(
         select(OtpCode)
         .where(
-            OtpCode.phone == phone,
+            OtpCode.destination == destination,
             OtpCode.purpose == OTP_PURPOSE_LOGIN,
             OtpCode.consumed.is_(False),
             OtpCode.expires_at > _now(),
@@ -156,7 +187,9 @@ def verify_otp(db: Session, phone: str, code: str) -> tuple[User, bool]:
         .with_for_update()
     ).first()
 
-    if otp is None or not constant_time_equals(otp.code_hash, _otp_hash(phone, code)):
+    if otp is None or not constant_time_equals(
+        otp.code_hash, _otp_hash(destination, code)
+    ):
         if otp is not None:
             otp.attempts += 1
             if otp.attempts >= settings.auth_max_attempts:
@@ -173,30 +206,79 @@ def verify_otp(db: Session, phone: str, code: str) -> tuple[User, bool]:
 
     otp.consumed = True
     lockout.reset()
+    return _sign_in(db, destination)
 
-    user = db.scalars(
-        select(User).where(User.phone == phone, User.deleted_at.is_(None))
-    ).first()
-    is_new = user is None
-    if user is None:
-        user = User(
-            phone=phone,
-            username=_provisional_username(db),
-            role="user",
-            profile_pending=True,
-            whatsapp_optin=True,
-            is_active=True,
-            phone_verified=True,
-            email_verified=False,
+
+def verify_link(db: Session, token: str) -> tuple[User, bool]:
+    """Valida el link del mail (token de 256 bits, un solo uso)."""
+    otp = db.scalars(
+        select(OtpCode)
+        .where(
+            OtpCode.link_hash == _link_hash(token),
+            OtpCode.purpose == OTP_PURPOSE_LOGIN,
+            OtpCode.consumed.is_(False),
+            OtpCode.expires_at > _now(),
         )
-        db.add(user)
-    elif not user.is_active:
+        .with_for_update()
+    ).first()
+    if otp is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="El link venció o ya se usó. Pedí un código nuevo.",
+        )
+    otp.consumed = True
+    _otp_lockout(otp.destination).reset()
+    return _sign_in(db, otp.destination)
+
+
+def _find_or_create(db: Session, destination: str) -> tuple[User, bool]:
+    """Usuario dueño del destino verificado; si no hay, lo da de alta.
+
+    Solo cuenta quien lo tiene verificado: un email o teléfono cargado en otro
+    perfil sin verificar no da acceso a esa cuenta (evita que alguien "reserve"
+    el email ajeno y después reciba la sesión de su dueño).
+    """
+    if _is_email(destination):
+        column, verified = User.email, User.email_verified
+    else:
+        column, verified = User.phone, User.phone_verified
+    user = db.scalars(
+        select(User).where(
+            column == destination, verified.is_(True), User.deleted_at.is_(None)
+        )
+    ).first()
+    if user is not None:
+        return user, False
+
+    if _is_email(destination):
+        # El email es único: se lo saca al perfil que lo tenía sin verificar.
+        db.execute(
+            update(User)
+            .where(User.email == destination, User.email_verified.is_(False))
+            .values(email=None)
+        )
+    user = User(
+        phone=None if _is_email(destination) else destination,
+        email=destination if _is_email(destination) else None,
+        username=_provisional_username(db),
+        role="user",
+        profile_pending=True,
+        whatsapp_optin=True,
+        is_active=True,
+        phone_verified=not _is_email(destination),
+        email_verified=_is_email(destination),
+    )
+    db.add(user)
+    return user, True
+
+
+def _sign_in(db: Session, destination: str) -> tuple[User, bool]:
+    user, is_new = _find_or_create(db, destination)
+    if not user.is_active:
         db.commit()
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="La cuenta está suspendida"
         )
-
-    user.phone_verified = True
     user.last_login = _now()
     db.commit()
     db.refresh(user)
@@ -215,12 +297,15 @@ def _provisional_username(db: Session) -> str:
 # --- Password (método secundario) ------------------------------------------
 
 
-def login_with_password(db: Session, phone: str, password: str) -> User:
-    lockout = _password_lockout(phone)
+def login_with_password(db: Session, identifier: str, password: str) -> User:
+    """identifier: email (en minúsculas) o teléfono normalizado."""
+    lockout = _password_lockout(identifier)
     lockout.ensure_not_locked()
-    user = db.scalars(
-        select(User).where(User.phone == phone, User.deleted_at.is_(None))
-    ).first()
+    if _is_email(identifier):
+        where = (User.email == identifier, User.email_verified.is_(True))
+    else:
+        where = (User.phone == identifier, User.phone_verified.is_(True))
+    user = db.scalars(select(User).where(*where, User.deleted_at.is_(None))).first()
     if (
         user is None
         or not user.password_hash
@@ -228,7 +313,14 @@ def login_with_password(db: Session, phone: str, password: str) -> User:
     ):
         if lockout.register_failure() == 0:
             lockout.ensure_not_locked()
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=INVALID_CREDENTIALS)
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                INVALID_EMAIL_CREDENTIALS
+                if _is_email(identifier)
+                else INVALID_CREDENTIALS
+            ),
+        )
     if not user.is_active:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, detail="La cuenta está suspendida"

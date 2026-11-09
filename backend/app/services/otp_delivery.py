@@ -1,25 +1,31 @@
-"""Envío de códigos OTP por WhatsApp Cloud API (Meta) y SMS (Twilio).
+"""Envío de códigos OTP por email (SMTP), WhatsApp Cloud API (Meta) y SMS (Twilio).
 
-Cada proveedor es una integración real contra la API del servicio. Se activan
-solo con configurar sus variables de entorno (ver .env.example); el
-despachador prueba los canales en el orden de OTP_CHANNELS y usa el siguiente
-si uno falla.
+Cada proveedor es una integración real contra el servicio. Se activan solo con
+configurar sus variables de entorno (ver .env.example). LOGIN_METHOD elige el
+canal: "email" manda el código y un link para entrar directo; "phone" prueba
+los canales de OTP_CHANNELS en orden y usa el siguiente si uno falla.
 """
 
 from __future__ import annotations
 
+import html
+import smtplib
+import ssl
 from dataclasses import dataclass
+from email.message import EmailMessage
+from email.utils import make_msgid
 from typing import Any, Protocol
 
 import httpx
 
 from app.config import Settings, settings
 from app.core.logging import get_logger
-from app.core.phone import mask_phone, wa_digits
+from app.core.phone import mask_destination, wa_digits
 
 log = get_logger(__name__)
 
 HTTP_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
+SMTP_TIMEOUT = 15
 
 
 class OtpDeliveryError(Exception):
@@ -33,9 +39,117 @@ class OtpDeliveryUnavailable(Exception):
 class OtpSender(Protocol):
     channel: str
 
-    def send(self, phone: str, code: str) -> str:
-        """Envía el código; devuelve el id de mensaje del proveedor."""
+    def send(self, destination: str, code: str, link: str | None = None) -> str:
+        """Envía el código (y el link, si el canal lo admite).
+
+        Devuelve el id de mensaje del proveedor.
+        """
         ...
+
+
+@dataclass
+class EmailOtpSender:
+    """Mail con el código y un botón que entra directo (link de un solo uso)."""
+
+    config: Settings
+    channel: str = "email"
+
+    def message(self, destination: str, code: str, link: str | None) -> EmailMessage:
+        minutes = self.config.email_otp_ttl_minutes
+        msg = EmailMessage()
+        msg["Subject"] = f"{code} es tu código de CompraVendeAqui"
+        msg["From"] = self.config.email_from
+        msg["To"] = destination
+        domain = self.config.email_from.rpartition("@")[2].strip("> ") or None
+        msg["Message-ID"] = make_msgid(domain=domain)
+
+        lines = [
+            "¡Hola!",
+            "",
+            f"Tu código para ingresar a CompraVendeAqui es: {code}",
+            "",
+        ]
+        if link:
+            lines += [
+                "O tocá este link y entrás directo a publicar tu aviso.",
+                "Si lo abrís en el celular, podés sacar las fotos en el momento:",
+                link,
+                "",
+            ]
+        lines += [
+            f"El código y el link vencen en {minutes} minutos y sirven una sola vez.",
+            "Si no pediste ingresar, ignorá este mail: nadie puede entrar sin él.",
+        ]
+        msg.set_content("\n".join(lines))
+        msg.add_alternative(_email_html(code, link, minutes), subtype="html")
+        return msg
+
+    def send(self, destination: str, code: str, link: str | None = None) -> str:
+        c = self.config
+        msg = self.message(destination, code, link)
+        try:
+            smtp: smtplib.SMTP
+            if c.smtp_security == "ssl":
+                smtp = smtplib.SMTP_SSL(
+                    c.smtp_host,
+                    c.smtp_port,
+                    timeout=SMTP_TIMEOUT,
+                    context=ssl.create_default_context(),
+                )
+            else:
+                smtp = smtplib.SMTP(c.smtp_host, c.smtp_port, timeout=SMTP_TIMEOUT)
+            with smtp:
+                if c.smtp_security == "starttls":
+                    smtp.starttls(context=ssl.create_default_context())
+                if c.smtp_username:
+                    smtp.login(c.smtp_username, c.smtp_password)
+                refused = smtp.send_message(msg)
+        except (smtplib.SMTPException, OSError) as exc:
+            raise OtpDeliveryError(f"email: {type(exc).__name__} ({exc})") from exc
+        if refused:
+            raise OtpDeliveryError(f"email: destinatario rechazado {refused}")
+        return str(msg["Message-ID"])
+
+
+def _email_html(code: str, link: str | None, minutes: int) -> str:
+    """HTML simple con estilos en línea (los clientes de mail no leen CSS)."""
+    button = ""
+    if link:
+        href = html.escape(link, quote=True)
+        button = f"""
+      <tr><td style="padding:8px 0 4px">
+        <a href="{href}" style="display:inline-block;background:#15803d;color:#ffffff;
+          font-weight:700;font-size:17px;text-decoration:none;padding:14px 28px;
+          border-radius:10px">Entrar y publicar mi aviso</a>
+      </td></tr>
+      <tr><td style="padding:4px 0 20px;color:#475569;font-size:14px;line-height:1.5">
+        Si lo abrís en el celular, podés sacar las fotos en el momento.
+      </td></tr>"""
+    return f"""<!DOCTYPE html>
+<html lang="es"><body style="margin:0;background:#eff6ff;
+  font-family:Arial,Helvetica,sans-serif">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+    style="background:#eff6ff;padding:24px 12px">
+  <tr><td align="center">
+    <table role="presentation" cellpadding="0" cellspacing="0"
+      style="max-width:480px;width:100%;background:#ffffff;
+      border-radius:14px;padding:28px">
+      <tr><td style="color:#1e40af;font-size:22px;font-weight:700;padding-bottom:12px">
+        CompraVendeAqui
+      </td></tr>
+      <tr><td style="color:#1e293b;font-size:16px;line-height:1.5;padding-bottom:8px">
+        Tu código para ingresar es:
+      </td></tr>
+      <tr><td style="color:#1e40af;font-size:34px;font-weight:700;
+        letter-spacing:8px;padding-bottom:20px">{html.escape(code)}</td></tr>{button}
+      <tr><td style="color:#475569;font-size:13px;line-height:1.5;
+        border-top:1px solid #e2e8f0;padding-top:16px">
+        El código y el link vencen en {minutes} minutos y sirven una sola vez.
+        Si no pediste ingresar, ignorá este mail: nadie puede entrar sin él.
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>"""
 
 
 @dataclass
@@ -81,11 +195,11 @@ class WhatsAppCloudSender:
             },
         }
 
-    def send(self, phone: str, code: str) -> str:
+    def send(self, destination: str, code: str, link: str | None = None) -> str:
         try:
             response = httpx.post(
                 self.url,
-                json=self.payload(phone, code),
+                json=self.payload(destination, code),
                 headers={
                     "Authorization": f"Bearer {self.config.whatsapp_access_token}"
                 },
@@ -137,11 +251,11 @@ class TwilioSmsSender:
             data["From"] = self.config.twilio_from_number
         return data
 
-    def send(self, phone: str, code: str) -> str:
+    def send(self, destination: str, code: str, link: str | None = None) -> str:
         try:
             response = httpx.post(
                 self.url,
-                data=self.form(phone, code),
+                data=self.form(destination, code),
                 auth=(self.config.twilio_account_sid, self.config.twilio_auth_token),
                 timeout=HTTP_TIMEOUT,
             )
@@ -169,7 +283,9 @@ def _json(response: httpx.Response) -> dict[str, Any]:
 
 
 def configured_senders(config: Settings = settings) -> list[OtpSender]:
-    """Proveedores configurados, en el orden de OTP_CHANNELS."""
+    """Proveedores configurados para LOGIN_METHOD (teléfono: orden de OTP_CHANNELS)."""
+    if config.login_method == "email":
+        return [EmailOtpSender(config)] if config.email_configured else []
     available: dict[str, OtpSender] = {}
     if config.whatsapp_configured:
         available["whatsapp"] = WhatsAppCloudSender(config)
@@ -184,24 +300,24 @@ class OtpDispatcher:
     def __init__(self, senders: list[OtpSender]):
         self.senders = senders
 
-    def send(self, phone: str, code: str) -> str:
+    def send(self, destination: str, code: str, link: str | None = None) -> str:
         if not self.senders:
             raise OtpDeliveryUnavailable("No hay ningún canal de OTP configurado")
         for sender in self.senders:
             try:
-                message_id = sender.send(phone, code)
+                message_id = sender.send(destination, code, link)
             except OtpDeliveryError as exc:
                 log.warning(
                     "otp.delivery_failed",
                     channel=sender.channel,
-                    phone=mask_phone(phone),
+                    to=mask_destination(destination),
                     error=str(exc),
                 )
                 continue
             log.info(
                 "otp.sent",
                 channel=sender.channel,
-                phone=mask_phone(phone),
+                to=mask_destination(destination),
                 message_id=message_id,
             )
             return sender.channel

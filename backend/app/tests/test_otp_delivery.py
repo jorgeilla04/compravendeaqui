@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import smtplib
+from email.message import EmailMessage
 
 import httpx
 import pytest
@@ -10,6 +12,7 @@ import respx
 
 from app.config import Settings
 from app.services.otp_delivery import (
+    EmailOtpSender,
     OtpDeliveryError,
     OtpDeliveryUnavailable,
     OtpDispatcher,
@@ -152,14 +155,14 @@ def test_configured_senders_respects_order_and_credentials() -> None:
 class Failing:
     channel = "whatsapp"
 
-    def send(self, phone: str, code: str) -> str:
+    def send(self, phone: str, code: str, link: str | None = None) -> str:
         raise OtpDeliveryError("caído")
 
 
 class Ok:
     channel = "sms"
 
-    def send(self, phone: str, code: str) -> str:
+    def send(self, phone: str, code: str, link: str | None = None) -> str:
         return "SM1"
 
 
@@ -172,3 +175,135 @@ def test_dispatcher_without_channels_is_unavailable() -> None:
         OtpDispatcher([]).send(PHONE, "1")
     with pytest.raises(OtpDeliveryUnavailable):
         OtpDispatcher([Failing()]).send(PHONE, "1")
+
+
+# --- Email (SMTP) ------------------------------------------------------------
+
+
+def email_settings(**kw: object) -> Settings:
+    base: dict[str, object] = dict(
+        login_method="email",
+        smtp_host="smtp.test",
+        smtp_port=587,
+        smtp_username="apikey",
+        smtp_password="secreto",
+        email_from="CompraVendeAqui <no-responder@compravendeaqui.com.ar>",
+    )
+    base.update(kw)
+    return Settings(**base)  # type: ignore[arg-type]
+
+
+class FakeSMTP:
+    """Doble de smtplib.SMTP: registra lo que haría la conexión real."""
+
+    instances: list[FakeSMTP] = []
+    refuse: dict[str, tuple[int, bytes]] = {}
+    fail: Exception | None = None
+
+    def __init__(self, host: str, port: int, **kw: object) -> None:
+        if FakeSMTP.fail:
+            raise FakeSMTP.fail
+        self.host, self.port, self.kw = host, port, kw
+        self.calls: list[str] = []
+        self.sent: list[EmailMessage] = []
+        FakeSMTP.instances.append(self)
+
+    def __enter__(self) -> FakeSMTP:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.calls.append("quit")
+
+    def starttls(self, **kw: object) -> None:
+        self.calls.append("starttls")
+
+    def login(self, user: str, password: str) -> None:
+        self.calls.append(f"login:{user}")
+
+    def send_message(self, msg: EmailMessage) -> dict[str, tuple[int, bytes]]:
+        self.sent.append(msg)
+        return FakeSMTP.refuse
+
+
+@pytest.fixture
+def fake_smtp(monkeypatch: pytest.MonkeyPatch) -> type[FakeSMTP]:
+    FakeSMTP.instances, FakeSMTP.refuse, FakeSMTP.fail = [], {}, None
+    monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setattr(smtplib, "SMTP_SSL", FakeSMTP)
+    return FakeSMTP
+
+
+LINK = "https://compravendeaqui.com.ar/ingresar/enlace?t=abc&next=%2Fpublicar"
+
+
+def test_email_sends_code_and_publish_button(fake_smtp: type[FakeSMTP]) -> None:
+    sender = EmailOtpSender(email_settings())
+    message_id = sender.send("juan@gmail.com", "482913", LINK)
+
+    smtp = fake_smtp.instances[0]
+    assert (smtp.host, smtp.port) == ("smtp.test", 587)
+    assert smtp.calls == ["starttls", "login:apikey", "quit"]
+    msg = smtp.sent[0]
+    assert msg["To"] == "juan@gmail.com"
+    assert msg["Subject"] == "482913 es tu código de CompraVendeAqui"
+    assert message_id == msg["Message-ID"]
+    assert "@compravendeaqui.com.ar>" in message_id
+    text = msg.get_body(("plain",)).get_content()  # type: ignore[union-attr]
+    page = msg.get_body(("html",)).get_content()  # type: ignore[union-attr]
+    assert "482913" in text and LINK in text
+    assert "482913" in page
+    assert 'href="https://compravendeaqui.com.ar/ingresar/enlace?t=abc&amp;next' in page
+    assert "Entrar y publicar mi aviso" in page
+    assert "vencen en 15 minutos" in text
+    assert "sacar las fotos" in page
+
+
+def test_email_without_link_has_only_the_code(fake_smtp: type[FakeSMTP]) -> None:
+    EmailOtpSender(email_settings()).send("juan@gmail.com", "111222")
+    msg = fake_smtp.instances[0].sent[0]
+    page = msg.get_body(("html",)).get_content()  # type: ignore[union-attr]
+    assert "111222" in page and "Entrar y publicar" not in page
+
+
+def test_email_ssl_and_no_auth(fake_smtp: type[FakeSMTP]) -> None:
+    EmailOtpSender(
+        email_settings(smtp_security="ssl", smtp_port=465, smtp_username="")
+    ).send("juan@gmail.com", "111222", LINK)
+    smtp = fake_smtp.instances[0]
+    assert smtp.port == 465 and "context" in smtp.kw
+    assert smtp.calls == ["quit"]
+
+
+def test_email_errors_become_delivery_errors(fake_smtp: type[FakeSMTP]) -> None:
+    sender = EmailOtpSender(email_settings())
+    fake_smtp.fail = smtplib.SMTPAuthenticationError(535, b"bad credentials")
+    with pytest.raises(OtpDeliveryError, match="SMTPAuthenticationError"):
+        sender.send("juan@gmail.com", "111222", LINK)
+    fake_smtp.fail = OSError("connection refused")
+    with pytest.raises(OtpDeliveryError, match="connection refused"):
+        sender.send("juan@gmail.com", "111222", LINK)
+    fake_smtp.fail = None
+    fake_smtp.refuse = {"juan@gmail.com": (550, b"no such user")}
+    with pytest.raises(OtpDeliveryError, match="rechazado"):
+        sender.send("juan@gmail.com", "111222", LINK)
+
+
+def test_configured_senders_follow_login_method() -> None:
+    assert [s.channel for s in configured_senders(email_settings())] == ["email"]
+    assert configured_senders(email_settings(smtp_host="")) == []
+    # Con ingreso por email, WhatsApp configurado no se usa (queda oculto).
+    both = email_settings(
+        whatsapp_phone_number_id="1",
+        whatsapp_access_token="t",
+        whatsapp_otp_template_name="x",
+    )
+    assert [s.channel for s in configured_senders(both)] == ["email"]
+    both.login_method = "phone"
+    assert [s.channel for s in configured_senders(both)] == ["whatsapp"]
+
+
+def test_dispatcher_passes_the_link_to_email(fake_smtp: type[FakeSMTP]) -> None:
+    dispatcher = OtpDispatcher(configured_senders(email_settings()))
+    assert dispatcher.send("juan@gmail.com", "482913", LINK) == "email"
+    msg = fake_smtp.instances[0].sent[0]
+    assert LINK in msg.get_body(("plain",)).get_content()  # type: ignore[union-attr]

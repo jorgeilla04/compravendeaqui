@@ -4,8 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { validateProfile } from "@/components/auth/login/profile-step";
 import { safeNext } from "@/components/auth/login/safe-next";
-import IngresarPage from "@/app/ingresar/page";
+import { LoginFlow } from "@/components/auth/login/login-flow";
 import type { Me } from "@/lib/types";
+import { type Handler, mockApi } from "@/test-utils/api-mock";
 
 const replace = jest.fn();
 let search = new URLSearchParams();
@@ -20,44 +21,6 @@ jest.mock("next/navigation", () => ({
   useSearchParams: () => search,
   usePathname: () => "/ingresar",
 }));
-
-type Handler = (body: unknown) => {
-  status: number;
-  json?: unknown;
-  headers?: Record<string, string>;
-};
-
-/** Doble de fetch: responde según "MÉTODO /ruta" y registra las llamadas. */
-function mockApi(routes: Record<string, Handler>) {
-  const calls: { key: string; body: unknown }[] = [];
-  global.fetch = jest.fn(
-    async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(String(input));
-      const key = `${init?.method ?? "GET"} ${url.pathname.replace(/^\/api\/v1/, "")}`;
-      const body =
-        typeof init?.body === "string" ? JSON.parse(init.body) : init?.body;
-      calls.push({ key, body });
-      const handler = routes[key];
-      const res = handler
-        ? handler(body)
-        : { status: 404, json: { detail: "No encontrado" } };
-      // jsdom no expone Response: objeto con la forma que usa lib/api.
-      const headers = new Map(
-        Object.entries(res.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]),
-      );
-      return {
-        ok: res.status >= 200 && res.status < 300,
-        status: res.status,
-        headers: { get: (n: string) => headers.get(n.toLowerCase()) ?? null },
-        json: async () => {
-          if (res.json === undefined) throw new SyntaxError("Sin cuerpo");
-          return res.json;
-        },
-      } as unknown as Response;
-    },
-  ) as jest.Mock;
-  return calls;
-}
 
 const unauthenticated: Record<string, Handler> = {
   "GET /auth/me": () => ({ status: 401, json: { detail: "No autenticado" } }),
@@ -77,6 +40,7 @@ function makeUser(overrides: Partial<Me> = {}): Me {
     phone_masked: "+54 9 264 ***-3456",
     phone_verified: true,
     email: null,
+    email_verified: false,
     full_name: null,
     role: "user",
     whatsapp_optin: true,
@@ -87,16 +51,17 @@ function makeUser(overrides: Partial<Me> = {}): Me {
 }
 
 const otpResponse = {
-  phone: "+54 9 264 ***-3456",
+  destination: "+54 9 264 ***-3456",
   channel: "whatsapp",
   expires_in: 300,
   resend_in: 30,
 };
 
+/** Estos tests recorren el ingreso por celular (WhatsApp); el de email está en ingresar-email. */
 function renderPage() {
   return render(
     <AuthProvider>
-      <IngresarPage />
+      <LoginFlow method="phone" />
     </AuthProvider>,
   );
 }
@@ -130,6 +95,7 @@ describe("validateProfile", () => {
     username: "juan.perez",
     full_name: "Juan Pérez",
     email: "",
+    phone: "",
     password: "",
     accept_terms: true,
     whatsapp_optin: true,

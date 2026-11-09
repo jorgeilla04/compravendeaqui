@@ -20,6 +20,8 @@
 
 **Backend**
 - [x] `POST /auth/otp/request` — envía OTP por WhatsApp/SMS
+- [x] Ingreso por email (`LOGIN_METHOD=email`, activo): código + link de un solo uso "Entrar y publicar" (`POST /auth/otp/link`); WhatsApp queda detrás del mismo interruptor (`GET /auth/methods`)
+- [x] Con ingreso por email el celular de WhatsApp se pide al completar el perfil (sin verificar; único solo entre verificados)
 - [x] `POST /auth/otp/verify` — verifica → login o registro
 - [x] `POST /auth/register` (email opcional), `POST /auth/login` (password opcional), `refresh`, `logout`, `GET /auth/me` ✅ — `register` completa el perfil tras el primer OTP (una sola vez); refresh rotativo con detección de reuso
 - [x] JWT access (15min) + refresh (7 días), tabla `refresh_tokens`
@@ -28,11 +30,14 @@
 
 **Frontend**
 - [x] Pantalla de ingreso por teléfono → OTP (mobile-first)
+- [x] Pantalla de ingreso por email y página del link del mail (`/ingresar/enlace`, entra solo al tocar el botón)
+- [x] "Sacar foto" con la cámara del celular al publicar
 - [x] Password como método secundario opcional
 - [x] Auth context/hook global; rutas protegidas
 
 **Testing**
 - [x] Unit del flujo OTP (90%); integración de endpoints; e2e de alta por teléfono
+- [x] e2e de alta por email y reingreso con el link desde otro dispositivo (SMTP falso)
 
 ### 1.2 Categorías y Navegación
 

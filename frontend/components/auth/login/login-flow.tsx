@@ -5,32 +5,36 @@ import * as React from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { CodeStep } from "@/components/auth/login/code-step";
+import { IdentityStep } from "@/components/auth/login/identity-step";
 import { PasswordStep } from "@/components/auth/login/password-step";
-import { PhoneStep } from "@/components/auth/login/phone-step";
 import { ProfileStep } from "@/components/auth/login/profile-step";
 import { safeNext } from "@/components/auth/login/safe-next";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { AuthResponse, OtpRequestResponse } from "@/lib/types";
+import type {
+  AuthResponse,
+  LoginMethod,
+  OtpRequestResponse,
+} from "@/lib/types";
 
 type Step =
-  | { name: "phone" }
+  | { name: "identity" }
   | { name: "password" }
   | { name: "code"; otp: OtpRequestResponse }
   | { name: "profile" };
 
 /**
- * Ingreso en una acción por pantalla: celular → código → (perfil si es nuevo).
- * La redirección al destino (`next`) vive en un solo lugar: el efecto que
- * observa al usuario de la sesión.
+ * Ingreso en una acción por pantalla: email (o celular) → código → (perfil si
+ * es nuevo). La redirección al destino (`next`) vive en un solo lugar: el
+ * efecto que observa al usuario de la sesión.
  */
-export function LoginFlow() {
+export function LoginFlow({ method }: { method: LoginMethod }) {
   const { user, loading, setUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
 
-  const [step, setStep] = React.useState<Step>({ name: "phone" });
-  const [phone, setPhone] = React.useState("");
+  const [step, setStep] = React.useState<Step>({ name: "identity" });
+  const [identity, setIdentity] = React.useState("");
 
   React.useEffect(() => {
     if (!loading && user && !user.profile_pending) router.replace(next);
@@ -61,34 +65,39 @@ export function LoginFlow() {
     case "code":
       return (
         <CodeStep
-          phone={phone}
+          method={method}
+          value={identity}
+          next={next}
           otp={current.otp}
           onVerified={handleAuthenticated}
           onResent={(otp) => setStep({ name: "code", otp })}
-          onChangePhone={() => setStep({ name: "phone" })}
+          onChangePhone={() => setStep({ name: "identity" })}
         />
       );
     case "password":
       return (
         <PasswordStep
-          initialPhone={phone}
+          method={method}
+          initialValue={identity}
           onLoggedIn={handleAuthenticated}
           onUseCode={(value) => {
-            setPhone(value);
-            setStep({ name: "phone" });
+            setIdentity(value);
+            setStep({ name: "identity" });
           }}
         />
       );
     default:
       return (
-        <PhoneStep
-          initialPhone={phone}
+        <IdentityStep
+          method={method}
+          initialValue={identity}
+          next={next}
           onSent={(value, otp) => {
-            setPhone(value);
+            setIdentity(value);
             setStep({ name: "code", otp });
           }}
           onUsePassword={(value) => {
-            setPhone(value);
+            setIdentity(value);
             setStep({ name: "password" });
           }}
         />

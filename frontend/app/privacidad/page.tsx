@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Política de privacidad" updated="3 de noviembre de 2026">
+    <LegalPage title="Política de privacidad" updated="9 de noviembre de 2026">
       <p>
         Esta política explica qué datos personales recolectamos, para qué los
         usamos y cómo podés ejercer tus derechos, según la Ley 25.326 de
@@ -28,12 +28,14 @@ export default function PrivacyPage() {
       <h2>2. Qué datos tratamos</h2>
       <ul>
         <li>
-          Tu número de celular (para verificar tu identidad con un código y para
-          que los compradores te contacten).
+          Tu email (para verificar tu identidad con un código o un link de
+          ingreso).
         </li>
         <li>
-          Nombre, nombre de usuario y, si lo cargás, email y foto de perfil.
+          Tu número de celular (para que los compradores te contacten por
+          WhatsApp y, si ingresás con el celular, para verificar tu identidad).
         </li>
+        <li>Nombre, nombre de usuario y, si la cargás, foto de perfil.</li>
         <li>Tus avisos: textos, fotos, precio, departamento y localidad.</li>
         <li>
           Datos técnicos mínimos: dirección IP y registros de uso, para
@@ -48,7 +50,8 @@ export default function PrivacyPage() {
       <h2>3. Para qué los usamos</h2>
       <ul>
         <li>
-          Crear y proteger tu cuenta (código de ingreso por WhatsApp o SMS).
+          Crear y proteger tu cuenta (código o link de ingreso por email, o
+          código por WhatsApp o SMS).
         </li>
         <li>
           Mostrar tus avisos y permitir que te contacten por WhatsApp, si lo
@@ -72,11 +75,12 @@ export default function PrivacyPage() {
       <h2>5. Con quién compartimos datos</h2>
       <p>
         Con proveedores que necesitamos para funcionar, que solo usan los datos
-        para prestarnos el servicio: el envío del código de ingreso (Meta
-        Platforms — WhatsApp Business — y Twilio para SMS), el almacenamiento de
-        fotos y el alojamiento del sitio. Algunos de estos proveedores pueden
-        procesar datos fuera de la Argentina, con las garantías que exige la
-        normativa vigente.
+        para prestarnos el servicio: el envío del código de ingreso (el
+        proveedor de correo electrónico y, si se usa el celular, Meta Platforms
+        — WhatsApp Business — y Twilio para SMS), el almacenamiento de fotos y
+        el alojamiento del sitio. Algunos de estos proveedores pueden procesar
+        datos fuera de la Argentina, con las garantías que exige la normativa
+        vigente.
       </p>
 
       <h2>6. Tus derechos</h2>

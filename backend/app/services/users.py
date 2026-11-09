@@ -32,6 +32,7 @@ def to_me(user: User) -> MeOut:
         phone_masked=mask_phone(user.phone) if user.phone else None,
         phone_verified=user.phone_verified,
         email=user.email,
+        email_verified=user.email_verified,
         full_name=user.full_name,
         role=user.role,
         whatsapp_optin=user.whatsapp_optin,
@@ -63,11 +64,39 @@ def update_profile(db: Session, user: User, data: UserUpdateIn) -> User:
         _ensure_unique(db, user, "username", changes["username"])
     if changes.get("email"):
         changes["email"] = changes["email"].lower()
-        _ensure_unique(db, user, "email", changes["email"])
-        if changes["email"] != user.email:
+        if changes["email"] == user.email:
+            del changes["email"]
+        elif user.email_verified:
+            # Es con lo que ingresa: cambiarlo sin verificar el nuevo lo dejaría
+            # afuera de su cuenta.
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail=(
+                    "Tu email es con el que ingresás: por ahora no se puede cambiar"
+                ),
+            )
+        else:
+            _ensure_unique(db, user, "email", changes["email"])
             user.email_verified = False
+    if changes.get("phone") and changes["phone"] != user.phone:
+        if user.phone_verified:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail=(
+                    "Tu celular es con el que ingresás: por ahora no se puede cambiar"
+                ),
+            )
+        # Ingreso por email: es el WhatsApp de contacto, sin verificar.
+        user.phone_verified = False
     for key, value in changes.items():
-        if value is None and key in ("username", "full_name", "whatsapp_optin"):
+        if value is None and key in (
+            "username",
+            "full_name",
+            "whatsapp_optin",
+            "phone",
+        ):
+            continue
+        if key == "email" and value is None and user.email_verified:
             continue
         setattr(user, key, value)
     db.commit()

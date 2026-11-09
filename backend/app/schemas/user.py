@@ -5,7 +5,10 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.phone import InvalidPhoneError, normalize_ar_mobile
+from app.schemas.fields import Email
 
 
 class PublicUserOut(BaseModel):
@@ -28,6 +31,7 @@ class MeOut(PublicUserOut):
     phone_masked: str | None
     phone_verified: bool
     email: str | None
+    email_verified: bool
     full_name: str | None
     role: str
     whatsapp_optin: bool
@@ -40,8 +44,20 @@ class UserUpdateIn(BaseModel):
         default=None, min_length=3, max_length=30, pattern=r"^[a-z0-9_.]+$"
     )
     full_name: str | None = Field(default=None, min_length=2, max_length=120)
-    email: EmailStr | None = None
+    email: Email | None = None
+    # WhatsApp de contacto (queda sin verificar hasta que haya OTP por WhatsApp).
+    phone: str | None = Field(default=None, min_length=6, max_length=30)
     whatsapp_optin: bool | None = None
+
+    @field_validator("phone")
+    @classmethod
+    def _phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            return normalize_ar_mobile(value)
+        except InvalidPhoneError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 class PasswordSetIn(BaseModel):

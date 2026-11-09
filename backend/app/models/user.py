@@ -1,10 +1,15 @@
-"""Usuarios: el teléfono (verificado por OTP) es el identificador real."""
+"""Usuarios: se identifican por el email o el teléfono verificados por OTP.
+
+El teléfono también es el contacto de WhatsApp del vendedor: con ingreso por
+email se carga en el perfil sin verificar, por eso solo es único entre los
+verificados.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, Text
+from sqlalchemy import Boolean, DateTime, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -12,9 +17,16 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "users"
+    __table_args__ = (
+        Index(
+            "uq_users_phone_verified",
+            "phone",
+            unique=True,
+            postgresql_where=text("phone_verified"),
+        ),
+    )
 
-    # Nullable solo tras la baja de cuenta (anonimización, Ley 25.326).
-    phone: Mapped[str | None] = mapped_column(String(20), unique=True)
+    phone: Mapped[str | None] = mapped_column(String(20))
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     email: Mapped[str | None] = mapped_column(String(255), unique=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)

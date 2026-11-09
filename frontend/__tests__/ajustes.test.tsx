@@ -21,6 +21,7 @@ const me: Me = {
   phone_masked: "+54 9 264 ***-3456",
   phone_verified: true,
   email: null,
+  email_verified: false,
   full_name: "Juan Pérez",
   role: "user",
   whatsapp_optin: true,

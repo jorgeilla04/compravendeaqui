@@ -35,6 +35,7 @@ test.describe("Accesibilidad WCAG 2.1 AA", () => {
       "/deportes",
       listing.url_path,
       "/ingresar",
+      "/ingresar/enlace?t=token-de-prueba-para-la-auditoria-a11y&next=/publicar",
       "/terminos",
       "/privacidad",
       "/no-existe",
@@ -70,7 +71,9 @@ test.describe("Accesibilidad WCAG 2.1 AA", () => {
     page,
   }) => {
     await page.goto("/ingresar");
-    await page.getByLabel("Tu celular").fill("264 412-9911");
+    await page
+      .getByLabel("Tu email")
+      .fill(`a11y.${Date.now()}@e2e.compravendeaqui.com.ar`);
     await page.getByRole("button", { name: "Enviar código" }).click();
     await expect(page.getByLabel("Código de 6 números")).toBeVisible();
     await audit(page, "/ingresar (código)");

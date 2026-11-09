@@ -27,11 +27,11 @@ def test_otp_request_sends_code_and_stores_only_hash(
     assert response.status_code == 200
     body = response.json()
     assert body["channel"] == "whatsapp"
-    assert body["phone"] == "+54 9 264 ***-3456"
+    assert body["destination"] == "+54 9 264 ***-3456"
     sent_phone, code = otp_sender.sent[-1]
     assert sent_phone == E164 and len(code) == 6
 
-    stored = db.scalars(select(OtpCode).where(OtpCode.phone == E164)).one()
+    stored = db.scalars(select(OtpCode).where(OtpCode.destination == E164)).one()
     assert stored.code_hash != code and code not in stored.code_hash
 
 
