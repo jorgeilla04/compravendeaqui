@@ -60,6 +60,29 @@ export function validateProfile(
   return errors;
 }
 
+/**
+ * Lleva lo que escribe la persona al formato de usuario: sin tildes ni eñes
+ * ("maría" → "maria"), sin espacios y con guiones como guion bajo.
+ */
+export function normalizeUsername(raw: string): string {
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s/g, "")
+    .replace(/-/g, "_");
+}
+
+/** Orden de los campos en pantalla: el primero con error recibe el foco. */
+const FIELD_IDS: Partial<Record<keyof Errors, string>> = {
+  username: "username",
+  full_name: "full_name",
+  phone: "phone",
+  email: "email",
+  password: "new-password",
+  accept_terms: "accept_terms",
+};
+
 /** El backend asigna "usuario1234567" provisorio: no lo sugerimos. */
 function suggestUsername(user: Me | null): string {
   const base = user?.username ?? "";
@@ -107,7 +130,18 @@ export function ProfileStep({
     const found = validateProfile(values, needsPhone);
     setErrors(found);
     setServerError(null);
-    if (Object.keys(found).length > 0) return;
+    if (Object.keys(found).length > 0) {
+      // En el celular el error puede quedar arriba, fuera de la pantalla: se
+      // lleva el foco al primer campo con problema para que se vea qué falta.
+      const first = (Object.keys(FIELD_IDS) as (keyof Errors)[]).find(
+        (key) => found[key],
+      );
+      const id = first ? FIELD_IDS[first] : undefined;
+      const field = id ? document.getElementById(id) : null;
+      field?.scrollIntoView?.({ block: "center" });
+      field?.focus({ preventScroll: true });
+      return;
+    }
     setSaving(true);
     try {
       const me = await api<Me>("/auth/register", {
@@ -144,9 +178,7 @@ export function ProfileStep({
           spellCheck={false}
           hint="Minúsculas, números, _ o punto. Ej: juan.perez"
           value={values.username}
-          onChange={(e) =>
-            set("username", e.target.value.toLowerCase().replace(/\s/g, ""))
-          }
+          onChange={(e) => set("username", normalizeUsername(e.target.value))}
           error={errors.username}
           disabled={saving}
           required
@@ -280,6 +312,9 @@ export function ProfileStep({
           ) : null}
         </div>
 
+        {Object.keys(errors).length > 0 ? (
+          <FormMessage>Revisá los campos marcados en rojo.</FormMessage>
+        ) : null}
         {serverError ? <FormMessage>{serverError}</FormMessage> : null}
         <Button
           type="submit"
