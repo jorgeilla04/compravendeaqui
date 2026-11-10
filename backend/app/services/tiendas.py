@@ -233,7 +233,7 @@ def buscar(db: Session, q: str, *, limite: int = 12) -> list[TiendaEncontrada]:
     Las palabras que nombran a la tienda o a sus grupos ("uniformes",
     "colegios") la traen entera; el resto tiene que estar en el grupo
     ("san pablo", "don bosco", "rivadavia")."""
-    raices = _raices(q)
+    raices = _raices(q)[:6]  # acota el trabajo por búsqueda
     if not raices:
         return []
     encontradas = []
@@ -248,13 +248,12 @@ def buscar(db: Session, q: str, *, limite: int = 12) -> list[TiendaEncontrada]:
             grupos = [
                 g
                 for g in grupos
-                if all(
-                    _contiene(
-                        _raices(f"{g.nombre} {g.subtitulo or ''} {g.categoria or ''}"),
-                        r,
+                if (
+                    palabras := _raices(
+                        f"{g.nombre} {g.subtitulo or ''} {g.categoria or ''}"
                     )
-                    for r in resto
                 )
+                and all(_contiene(palabras, r) for r in resto)
             ]
             if not grupos and len(resto) == len(raices):
                 continue

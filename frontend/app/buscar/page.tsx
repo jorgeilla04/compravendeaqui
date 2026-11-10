@@ -39,7 +39,7 @@ export default async function SearchPage({ searchParams }: Props) {
       ? serverGet<TiendaEncontrada[]>(
           "/tiendas/buscar",
           { q: filters.q },
-          300,
+          cacheSeconds(filters),
         ).catch(() => null)
       : null,
   ]);
