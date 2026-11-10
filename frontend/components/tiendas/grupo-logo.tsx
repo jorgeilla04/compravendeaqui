@@ -21,14 +21,21 @@ export function GrupoLogo({
     lg: "size-20 text-h3",
   }[size];
   if (grupo.logo_url) {
+    // Más ancho que el provisorio: muchos logos son apaisados (escudo + nombre)
+    // y en un cuadrado quedarían ilegibles. object-contain no recorta.
+    const logoBox = {
+      sm: "h-10 w-20",
+      md: "h-14 w-28",
+      lg: "h-20 w-40",
+    }[size];
     return (
       // eslint-disable-next-line @next/next/no-img-element -- logo chico desde el bucket
       <img
         src={grupo.logo_url}
         alt={`Logo de ${grupo.nombre}`}
         className={cn(
-          box,
-          "shrink-0 rounded-input bg-card object-contain",
+          logoBox,
+          "shrink-0 rounded-input object-contain",
           className,
         )}
       />

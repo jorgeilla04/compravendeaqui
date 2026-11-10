@@ -159,7 +159,9 @@ export function GrupoExplorer({ tienda }: { tienda: Tienda }) {
                     href={`/tiendas/${tienda.slug}/${grupo.slug}`}
                     className="flex min-h-20 items-center gap-3 rounded-card border border-border bg-card p-3 transition-colors duration-200 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <GrupoLogo grupo={grupo} />
+                    <span className="flex w-28 shrink-0 justify-center">
+                      <GrupoLogo grupo={grupo} />
+                    </span>
                     <span className="flex min-w-0 flex-col">
                       <span className="font-semibold text-foreground">
                         {grupo.nombre}
