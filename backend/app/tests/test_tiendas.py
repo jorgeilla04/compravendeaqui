@@ -1227,3 +1227,34 @@ def test_make_admin(make_user: MakeUser, db: Any) -> None:
     assert {t["slug"] for t in client.get(ADMIN).json()} == {"uniformes"}
     assert set_role("jefe@mail.com", admin=False) is True
     assert client.get(ADMIN).json() == []
+
+
+def test_buscar_tiendas_y_colegios(client: TestClient, colegio: dict[str, Any]) -> None:
+    def buscar(q: str) -> list[dict[str, Any]]:
+        r = client.get(f"{API}/buscar", params={"q": q})
+        assert r.status_code == 200, r.text
+        data: list[dict[str, Any]] = r.json()
+        return data
+
+    # Nombrar la tienda o sus grupos la trae con todos los colegios (se
+    # listan hasta 12; total_grupos dice cuántos hay).
+    total = len(client.get(f"{API}/uniformes").json()["grupos"])
+    for q in ("colegios", "Uniformes", "uniforme escolar", "escuelas"):
+        (encontrada,) = buscar(q)
+        assert encontrada["tienda"]["slug"] == "uniformes"
+        assert encontrada["grupo_label"] == "Colegio"
+        assert encontrada["total_grupos"] == total
+        assert len(encontrada["grupos"]) == min(total, 12)
+
+    # El nombre del colegio, sin acentos ni mayúsculas, y con o sin "uniforme".
+    for q in ("santa rosa", "uniforme Santa Rosa de Lima", "colegio lima"):
+        (encontrada,) = buscar(q)
+        assert [g["slug"] for g in encontrada["grupos"]] == [colegio["slug"]]
+        assert encontrada["total_grupos"] == 1
+
+    # Con la tienda nombrada pero un colegio que no existe: la tienda, sin grupos.
+    (encontrada,) = buscar("uniforme colegio inexistente")
+    assert encontrada["grupos"] == []
+
+    assert buscar("heladera") == []
+    assert buscar("") == []

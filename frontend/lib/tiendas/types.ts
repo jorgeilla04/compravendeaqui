@@ -27,6 +27,14 @@ export interface Grupo {
   logo_url: string | null;
 }
 
+/** Tienda que coincide con la búsqueda del sitio y sus grupos que coinciden. */
+export interface TiendaEncontrada {
+  tienda: TiendaResumen;
+  grupo_label: string;
+  grupos: Grupo[];
+  total_grupos: number;
+}
+
 /** Config de cobro y entrega de la tienda (la usan el carrito y la cotización). */
 export interface TiendaReglas {
   entregas: Entrega[];
