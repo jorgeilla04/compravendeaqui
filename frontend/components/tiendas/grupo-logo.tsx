@@ -3,8 +3,8 @@ import { initials, readableText } from "@/lib/tiendas/color";
 import type { Grupo } from "@/lib/tiendas/types";
 
 /**
- * Logo oficial del grupo (escudo del colegio, por ejemplo) o, hasta tenerlo
- * con autorización, un recuadro provisorio con sus iniciales y sus colores.
+ * Logo del grupo (escudo del colegio, por ejemplo) o, mientras no tenga uno,
+ * un recuadro con sus iniciales y sus colores.
  */
 export function GrupoLogo({
   grupo,

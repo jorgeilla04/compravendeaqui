@@ -288,7 +288,7 @@ async def subir_logo(
     db: DbSession,
     file: Annotated[UploadFile, File()],
 ) -> GrupoAdminOut:
-    """Escudo o logo oficial (con autorización de la institución)."""
+    """Escudo o logo del grupo."""
     tienda = _tienda(db, user, slug)
     grupo = service.get_grupo(db, tienda, grupo_slug, include_inactive=True)
     anterior = grupo.logo_url

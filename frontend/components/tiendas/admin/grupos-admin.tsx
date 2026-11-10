@@ -163,7 +163,7 @@ function LogoUpload({
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-meta font-semibold">
-        Logo o escudo oficial (con autorización)
+        Logo o escudo del colegio
       </label>
       <input
         id={id}
@@ -295,61 +295,147 @@ function FotoProductoEnGrupo({
   grupo,
   producto,
   precio,
+  porDefecto,
   onPrecio,
 }: {
   slug: string;
   grupo: GrupoAdmin;
   producto: ProductoAdmin;
   precio: PrecioGrupo | undefined;
+  porDefecto: boolean;
   onPrecio: (p: PrecioGrupo) => void;
 }) {
   const { error, busy, run } = useUpload<PrecioGrupo>();
   const path = `/admin/tiendas/${slug}/grupos/${grupo.slug}/productos/${producto.slug}/foto`;
   const propia = precio?.foto_url ?? null;
   const id = `foto-${grupo.slug}-${producto.slug}`;
+  const [monto, setMonto] = React.useState(
+    precio?.precio ? String(Number(precio.precio)) : "",
+  );
+  const [disponible, setDisponible] = React.useState(
+    precio?.disponible ?? porDefecto,
+  );
+  const [status, setStatus] = React.useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
+  const [saving, setSaving] = React.useState(false);
+
+  async function guardarPrecio() {
+    setStatus(null);
+    setSaving(true);
+    try {
+      onPrecio(
+        await api<PrecioGrupo>(`/admin/tiendas/${slug}/precios`, {
+          method: "PUT",
+          body: {
+            grupo: grupo.slug,
+            producto: producto.slug,
+            precio: monto || null,
+            disponible,
+          },
+        }),
+      );
+      setStatus({ ok: true, text: "Guardado." });
+    } catch (err) {
+      setStatus({ ok: false, text: errorMessage(err) });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <li className="flex items-center gap-3">
-      <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-input border border-border bg-muted">
+    <li className="flex flex-col gap-3 rounded-card border border-border p-3">
+      <div className="flex items-center gap-3">
+        <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-input border border-border bg-muted">
+          {propia ? (
+            // eslint-disable-next-line @next/next/no-img-element -- foto del bucket
+            <img src={propia} alt="" className="size-full object-contain" />
+          ) : (
+            <span className="text-caption text-muted-foreground">—</span>
+          )}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <label htmlFor={id} className="text-meta font-semibold">
+            {producto.nombre}
+            <span className="font-normal text-muted-foreground">
+              {propia ? " · foto de este colegio" : " · usa la foto general"}
+            </span>
+          </label>
+          <input
+            id={id}
+            type="file"
+            accept={IMAGENES}
+            disabled={busy}
+            className="text-meta"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void run(path, { method: "POST", file }, onPrecio);
+            }}
+          />
+          {error ? <FormMessage>{error}</FormMessage> : null}
+        </div>
         {propia ? (
-          // eslint-disable-next-line @next/next/no-img-element -- foto del bucket
-          <img src={propia} alt="" className="size-full object-contain" />
-        ) : (
-          <span className="text-caption text-muted-foreground">—</span>
-        )}
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <label htmlFor={id} className="text-meta font-semibold">
-          {producto.nombre}
-          <span className="font-normal text-muted-foreground">
-            {propia ? " · foto de este colegio" : " · usa la foto general"}
-          </span>
-        </label>
-        <input
-          id={id}
-          type="file"
-          accept={IMAGENES}
-          disabled={busy}
-          className="text-meta"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) void run(path, { method: "POST", file }, onPrecio);
-          }}
-        />
-        {error ? <FormMessage>{error}</FormMessage> : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            onClick={() => run(path, { method: "DELETE" }, onPrecio)}
+            aria-label={`Quitar la foto de ${producto.nombre} en ${grupo.nombre}`}
+          >
+            Quitar
+          </Button>
+        ) : null}
       </div>
-      {propia ? (
+      <div className="flex flex-wrap items-end gap-3">
+        <label
+          htmlFor={`${id}-precio`}
+          className="flex flex-col gap-1 text-meta font-semibold"
+        >
+          Precio en este colegio ($)
+          <input
+            id={`${id}-precio`}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={100}
+            placeholder={`${Number(producto.precio_base)} (base)`}
+            value={monto}
+            onChange={(e) => setMonto(e.target.value)}
+            className="h-11 w-40 rounded-input border border-border bg-card px-3 text-base text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </label>
+        <label className="flex min-h-11 items-center gap-2 text-base">
+          <input
+            type="checkbox"
+            checked={disponible}
+            onChange={(e) => setDisponible(e.target.checked)}
+            className="size-5 accent-[var(--color-primary)]"
+          />
+          <span className="sr-only">{producto.nombre} </span>Lo vende
+        </label>
         <Button
           type="button"
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          onClick={() => run(path, { method: "DELETE" }, onPrecio)}
-          aria-label={`Quitar la foto de ${producto.nombre} en ${grupo.nombre}`}
+          variant="outline"
+          disabled={saving}
+          onClick={guardarPrecio}
+          aria-label={`Guardar precio de ${producto.nombre}`}
         >
-          Quitar
+          {saving ? "Guardando…" : "Guardar precio"}
         </Button>
-      ) : null}
+        {status ? (
+          <span
+            role="status"
+            className={
+              status.ok ? "text-meta text-accent" : "text-meta text-destructive"
+            }
+          >
+            {status.text}
+          </span>
+        ) : null}
+      </div>
     </li>
   );
 }
@@ -467,8 +553,12 @@ export function GruposAdmin({
                   {productos.length > 0 ? (
                     <fieldset className="flex flex-col gap-2">
                       <legend className="text-meta font-semibold">
-                        Foto de cada producto en {grupo.nombre}
+                        Precio y foto de cada producto en {grupo.nombre}
                       </legend>
+                      <p className="text-meta text-muted-foreground">
+                        Precio vacío = usa el precio base de &quot;Productos y
+                        precios&quot;.
+                      </p>
                       <ul className="flex flex-col gap-3">
                         {productos.map((producto) => (
                           <FotoProductoEnGrupo
@@ -481,6 +571,7 @@ export function GruposAdmin({
                                 p.grupo === grupo.slug &&
                                 p.producto === producto.slug,
                             )}
+                            porDefecto={tienda.productos_en_todos}
                             onPrecio={onPrecio}
                           />
                         ))}
