@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> str:
             raise SystemExit(f"No existe la tienda {args.tienda}")
         grupo = service.get_grupo(db, tienda, args.grupo, include_inactive=True)
         fotos = list(grupo.fotos or [])
+        reemplazadas: list[str | None] = []
         for path in args.galeria:
             if len(fotos) >= service.MAX_FOTOS_GRUPO:
                 raise SystemExit(f"Hasta {service.MAX_FOTOS_GRUPO} fotos por grupo")
@@ -47,11 +48,14 @@ def main(argv: list[str] | None = None) -> str:
         for slug, archivo in args.producto:
             producto = service.get_producto(db, tienda, slug)
             fila = service.fila_precio(db, tienda, grupo, producto)
+            if fila.foto_url:
+                reemplazadas.append(fila.foto_url)
             fila.foto_url = service.guardar_imagen(
                 Path(archivo).read_bytes(),
                 f"{tienda.slug}/grupos/{grupo.slug}/{producto.slug}",
             )
         db.commit()
+        service.borrar_imagenes(reemplazadas)
         prendas = len(args.producto)
         return (
             f"{grupo.nombre}: {len(fotos)} fotos en la galería, "

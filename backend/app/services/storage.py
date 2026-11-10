@@ -42,6 +42,18 @@ def public_url(key: str) -> str:
     return f"{base}/{key}"
 
 
+def key_from_url(url: str | None, prefix: str) -> str | None:
+    """Key de una URL pública propia, solo si cae bajo `prefix` (si no, None:
+    nunca se borra algo que no subimos nosotros)."""
+    base = public_url("")
+    if not url or not url.startswith(base):
+        return None
+    key = url[len(base) :]
+    if not key.startswith(prefix) or ".." in key:
+        return None
+    return key
+
+
 def put_object(key: str, data: bytes, content_type: str) -> str:
     try:
         _client().put_object(
