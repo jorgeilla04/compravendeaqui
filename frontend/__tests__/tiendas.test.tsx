@@ -142,6 +142,7 @@ const libreria: Tienda = {
 
 const detalle: GrupoDetalle = {
   ...santaRosa,
+  fotos: [],
   productos: [
     {
       slug: "remera",
@@ -803,7 +804,7 @@ describe("administración de tiendas", () => {
   };
   const catalogo: CatalogoAdmin = {
     tienda: tiendaAdmin,
-    grupos: [{ ...santaRosa, activo: true }],
+    grupos: [{ ...santaRosa, activo: true, fotos: [] }],
     productos: [
       {
         slug: "remera",
@@ -881,6 +882,75 @@ describe("administración de tiendas", () => {
     expect(
       await screen.findByText("No administrás esta tienda."),
     ).toBeVisible();
+  });
+
+  it("carga fotos del uniforme y de cada producto por colegio", async () => {
+    const user = userEvent.setup();
+    const base = "/admin/tiendas/uniformes/grupos/santa-rosa";
+    const calls = mockApi({
+      "GET /auth/me": () => ({ status: 200, json: me("user") }),
+      "GET /admin/tiendas/uniformes/catalogo": () => ({
+        status: 200,
+        json: catalogo,
+      }),
+      "GET /admin/tiendas/uniformes/pedidos": () => ({ status: 200, json: [] }),
+      [`POST ${base}/fotos`]: () => ({
+        status: 200,
+        json: {
+          ...catalogo.grupos[0],
+          fotos: ["https://cdn.test/uniforme.webp"],
+        },
+      }),
+      [`DELETE ${base}/fotos/0`]: () => ({
+        status: 200,
+        json: { ...catalogo.grupos[0], fotos: [] },
+      }),
+      [`POST ${base}/productos/remera/foto`]: () => ({
+        status: 200,
+        json: {
+          grupo: "santa-rosa",
+          producto: "remera",
+          precio: null,
+          disponible: true,
+          foto_url: "https://cdn.test/remera-sr.webp",
+        },
+      }),
+    });
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "Colegios" }));
+    await user.click(screen.getByText("Colegio Santa Rosa de Lima"));
+    const archivo = new File(["x"], "uniforme.png", { type: "image/png" });
+
+    await user.upload(screen.getByLabelText("Agregar foto"), archivo);
+    expect(
+      await screen.findByRole("img", {
+        name: "Foto 1 de Colegio Santa Rosa de Lima",
+      }),
+    ).toHaveAttribute("src", "https://cdn.test/uniforme.webp");
+    expect(
+      calls.find((c) => c.key === `POST ${base}/fotos`)?.body,
+    ).toBeInstanceOf(FormData);
+
+    await user.upload(
+      screen.getByLabelText(/Remera \/ chomba · usa la foto general/),
+      archivo,
+    );
+    expect(
+      await screen.findByLabelText(/Remera \/ chomba · foto de este colegio/),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Quitar foto 1 de Colegio Santa Rosa de Lima",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("img", {
+          name: "Foto 1 de Colegio Santa Rosa de Lima",
+        }),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it("el dueño gestiona pedidos, grupos, productos y la config de envío y pagos", async () => {

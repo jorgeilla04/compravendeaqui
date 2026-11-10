@@ -6,7 +6,12 @@ import { GrupoLogo } from "@/components/tiendas/grupo-logo";
 import { Button } from "@/components/ui/button";
 import { FormMessage, SelectField, TextField } from "@/components/ui/form";
 import { api, errorMessage } from "@/lib/api";
-import type { GrupoAdmin, TiendaAdmin } from "@/lib/tiendas/types";
+import type {
+  GrupoAdmin,
+  PrecioGrupo,
+  ProductoAdmin,
+  TiendaAdmin,
+} from "@/lib/tiendas/types";
 
 interface Draft {
   nombre: string;
@@ -193,14 +198,176 @@ function LogoUpload({
   );
 }
 
+const IMAGENES = "image/jpeg,image/png,image/webp";
+
+/** Sube un archivo elegido y devuelve lo que responda la API. */
+function useUpload<T>() {
+  const [error, setError] = React.useState<string | null>(null);
+  const [busy, setBusy] = React.useState(false);
+  async function run(
+    path: string,
+    init: { method: "POST"; file: File } | { method: "DELETE" },
+    onOk: (data: T) => void,
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      let body: FormData | undefined;
+      if (init.method === "POST") {
+        body = new FormData();
+        body.append("file", init.file, init.file.name);
+      }
+      onOk(await api<T>(path, { method: init.method, body }));
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return { error, busy, run };
+}
+
+function GaleriaGrupo({
+  slug,
+  grupo,
+  onChange,
+}: {
+  slug: string;
+  grupo: GrupoAdmin;
+  onChange: (g: GrupoAdmin) => void;
+}) {
+  const { error, busy, run } = useUpload<GrupoAdmin>();
+  const base = `/admin/tiendas/${slug}/grupos/${grupo.slug}/fotos`;
+  const id = `galeria-${grupo.slug}`;
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="text-meta font-semibold">
+        Fotos del uniforme completo
+      </legend>
+      {(grupo.fotos ?? []).length > 0 ? (
+        <ul className="flex flex-wrap gap-3">
+          {(grupo.fotos ?? []).map((url, i) => (
+            <li key={url} className="flex flex-col items-center gap-1">
+              {/* eslint-disable-next-line @next/next/no-img-element -- foto del bucket */}
+              <img
+                src={url}
+                alt={`Foto ${i + 1} de ${grupo.nombre}`}
+                className="size-24 rounded-input border border-border object-contain"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  run(`${base}/${i}`, { method: "DELETE" }, onChange)
+                }
+                aria-label={`Quitar foto ${i + 1} de ${grupo.nombre}`}
+              >
+                Quitar
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <label htmlFor={id} className="text-meta">
+        Agregar foto
+      </label>
+      <input
+        id={id}
+        type="file"
+        accept={IMAGENES}
+        disabled={busy}
+        className="text-meta"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) void run(base, { method: "POST", file }, onChange);
+        }}
+      />
+      {error ? <FormMessage>{error}</FormMessage> : null}
+    </fieldset>
+  );
+}
+
+function FotoProductoEnGrupo({
+  slug,
+  grupo,
+  producto,
+  precio,
+  onPrecio,
+}: {
+  slug: string;
+  grupo: GrupoAdmin;
+  producto: ProductoAdmin;
+  precio: PrecioGrupo | undefined;
+  onPrecio: (p: PrecioGrupo) => void;
+}) {
+  const { error, busy, run } = useUpload<PrecioGrupo>();
+  const path = `/admin/tiendas/${slug}/grupos/${grupo.slug}/productos/${producto.slug}/foto`;
+  const propia = precio?.foto_url ?? null;
+  const id = `foto-${grupo.slug}-${producto.slug}`;
+  return (
+    <li className="flex items-center gap-3">
+      <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-input border border-border bg-muted">
+        {propia ? (
+          // eslint-disable-next-line @next/next/no-img-element -- foto del bucket
+          <img src={propia} alt="" className="size-full object-contain" />
+        ) : (
+          <span className="text-caption text-muted-foreground">—</span>
+        )}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <label htmlFor={id} className="text-meta font-semibold">
+          {producto.nombre}
+          <span className="font-normal text-muted-foreground">
+            {propia ? " · foto de este colegio" : " · usa la foto general"}
+          </span>
+        </label>
+        <input
+          id={id}
+          type="file"
+          accept={IMAGENES}
+          disabled={busy}
+          className="text-meta"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void run(path, { method: "POST", file }, onPrecio);
+          }}
+        />
+        {error ? <FormMessage>{error}</FormMessage> : null}
+      </div>
+      {propia ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={busy}
+          onClick={() => run(path, { method: "DELETE" }, onPrecio)}
+          aria-label={`Quitar la foto de ${producto.nombre} en ${grupo.nombre}`}
+        >
+          Quitar
+        </Button>
+      ) : null}
+    </li>
+  );
+}
+
 export function GruposAdmin({
   tienda,
   grupos,
+  productos = [],
+  precios = [],
   onChange,
+  onPrecio = () => {},
 }: {
   tienda: TiendaAdmin;
   grupos: GrupoAdmin[];
+  productos?: ProductoAdmin[];
+  precios?: PrecioGrupo[];
   onChange: (grupos: GrupoAdmin[]) => void;
+  onPrecio?: (precio: PrecioGrupo) => void;
 }) {
   const [formKey, setFormKey] = React.useState(0);
   const label = tienda.grupo_label.toLowerCase();
@@ -292,6 +459,34 @@ export function GruposAdmin({
                     grupo={grupo}
                     onUploaded={replace}
                   />
+                  <GaleriaGrupo
+                    slug={tienda.slug}
+                    grupo={grupo}
+                    onChange={replace}
+                  />
+                  {productos.length > 0 ? (
+                    <fieldset className="flex flex-col gap-2">
+                      <legend className="text-meta font-semibold">
+                        Foto de cada producto en {grupo.nombre}
+                      </legend>
+                      <ul className="flex flex-col gap-3">
+                        {productos.map((producto) => (
+                          <FotoProductoEnGrupo
+                            key={producto.slug}
+                            slug={tienda.slug}
+                            grupo={grupo}
+                            producto={producto}
+                            precio={precios.find(
+                              (p) =>
+                                p.grupo === grupo.slug &&
+                                p.producto === producto.slug,
+                            )}
+                            onPrecio={onPrecio}
+                          />
+                        ))}
+                      </ul>
+                    </fieldset>
+                  ) : null}
                 </div>
               </details>
             </li>

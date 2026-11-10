@@ -104,6 +104,8 @@ class Grupo(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     color1: Mapped[str] = mapped_column(String(7))
     color2: Mapped[str] = mapped_column(String(7))
     logo_url: Mapped[str | None] = mapped_column(Text)
+    # Fotos del uniforme completo (galería del grupo).
+    fotos: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -143,6 +145,8 @@ class PrecioGrupo(Base):
     )
     precio: Mapped[Decimal | None] = mapped_column(MONEY)  # None = precio base
     disponible: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Foto del producto en este grupo (None = la foto general del producto).
+    foto_url: Mapped[str | None] = mapped_column(Text)
 
 
 class Pedido(UUIDPrimaryKeyMixin, TimestampMixin, Base):

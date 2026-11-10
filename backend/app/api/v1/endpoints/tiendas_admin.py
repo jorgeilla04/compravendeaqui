@@ -100,6 +100,7 @@ def catalogo(slug: str, user: CompleteUser, db: DbSession) -> CatalogoAdminOut:
                 producto=slug_producto[p.producto_id],
                 precio=p.precio,
                 disponible=p.disponible,
+                foto_url=p.foto_url,
             )
             for p in precios
         ],
@@ -298,6 +299,48 @@ async def subir_logo(
     return GrupoAdminOut.model_validate(grupo)
 
 
+@router.post("/{slug}/grupos/{grupo_slug}/fotos", response_model=GrupoAdminOut)
+async def agregar_foto_grupo(
+    slug: str,
+    grupo_slug: str,
+    user: CompleteUser,
+    db: DbSession,
+    file: Annotated[UploadFile, File()],
+) -> GrupoAdminOut:
+    """Foto del uniforme completo (galería del grupo)."""
+    tienda = _tienda(db, user, slug)
+    grupo = service.get_grupo(db, tienda, grupo_slug, include_inactive=True)
+    if len(grupo.fotos or []) >= service.MAX_FOTOS_GRUPO:
+        etiqueta = tienda.grupo_label.lower()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail=f"Hasta {service.MAX_FOTOS_GRUPO} fotos por {etiqueta}",
+        )
+    url = await service.subir_imagen(file, f"{tienda.slug}/grupos/{grupo.slug}")
+    grupo.fotos = [*(grupo.fotos or []), url]
+    db.commit()
+    db.refresh(grupo)
+    return GrupoAdminOut.model_validate(grupo)
+
+
+@router.delete(
+    "/{slug}/grupos/{grupo_slug}/fotos/{indice}", response_model=GrupoAdminOut
+)
+def quitar_foto_grupo(
+    slug: str, grupo_slug: str, indice: int, user: CompleteUser, db: DbSession
+) -> GrupoAdminOut:
+    tienda = _tienda(db, user, slug)
+    grupo = service.get_grupo(db, tienda, grupo_slug, include_inactive=True)
+    fotos = list(grupo.fotos or [])
+    if not 0 <= indice < len(fotos):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No existe esa foto")
+    del fotos[indice]
+    grupo.fotos = fotos
+    db.commit()
+    db.refresh(grupo)
+    return GrupoAdminOut.model_validate(grupo)
+
+
 # --- Productos y precios ------------------------------------------------------
 
 
@@ -367,20 +410,63 @@ def fijar_precio(
     tienda = _tienda(db, user, slug)
     grupo = service.get_grupo(db, tienda, body.grupo, include_inactive=True)
     producto = service.get_producto(db, tienda, body.producto)
-    fila = db.scalars(
-        select(PrecioGrupo).where(
-            PrecioGrupo.grupo_id == grupo.id, PrecioGrupo.producto_id == producto.id
-        )
-    ).first()
-    if fila is None:
-        fila = PrecioGrupo(grupo_id=grupo.id, producto_id=producto.id)
-        db.add(fila)
+    fila = service.fila_precio(db, tienda, grupo, producto)
     fila.precio = body.precio
     fila.disponible = body.disponible
     db.commit()
+    return _precio_out(grupo, producto, fila)
+
+
+def _precio_out(grupo: Grupo, producto: Producto, fila: PrecioGrupo) -> PrecioOut:
     return PrecioOut(
         grupo=grupo.slug,
         producto=producto.slug,
         precio=fila.precio,
         disponible=fila.disponible,
+        foto_url=fila.foto_url,
     )
+
+
+@router.post(
+    "/{slug}/grupos/{grupo_slug}/productos/{producto_slug}/foto",
+    response_model=PrecioOut,
+)
+async def subir_foto_en_grupo(
+    slug: str,
+    grupo_slug: str,
+    producto_slug: str,
+    user: CompleteUser,
+    db: DbSession,
+    file: Annotated[UploadFile, File()],
+) -> PrecioOut:
+    """Foto del producto para este grupo (ej.: la remera de un colegio)."""
+    tienda = _tienda(db, user, slug)
+    grupo = service.get_grupo(db, tienda, grupo_slug, include_inactive=True)
+    producto = service.get_producto(db, tienda, producto_slug)
+    url = await service.subir_imagen(
+        file, f"{tienda.slug}/grupos/{grupo.slug}/{producto.slug}"
+    )
+    fila = service.fila_precio(db, tienda, grupo, producto)
+    fila.foto_url = url
+    db.commit()
+    return _precio_out(grupo, producto, fila)
+
+
+@router.delete(
+    "/{slug}/grupos/{grupo_slug}/productos/{producto_slug}/foto",
+    response_model=PrecioOut,
+)
+def quitar_foto_en_grupo(
+    slug: str,
+    grupo_slug: str,
+    producto_slug: str,
+    user: CompleteUser,
+    db: DbSession,
+) -> PrecioOut:
+    tienda = _tienda(db, user, slug)
+    grupo = service.get_grupo(db, tienda, grupo_slug, include_inactive=True)
+    producto = service.get_producto(db, tienda, producto_slug)
+    fila = service.fila_precio(db, tienda, grupo, producto)
+    fila.foto_url = None
+    db.commit()
+    return _precio_out(grupo, producto, fila)

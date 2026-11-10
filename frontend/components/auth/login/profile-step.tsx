@@ -94,6 +94,12 @@ export function ProfileStep({
 
   function set<K extends keyof ProfileValues>(key: K, value: ProfileValues[K]) {
     setValues((v) => ({ ...v, [key]: value }));
+    // El error de un campo se va apenas se corrige, no recién al reenviar.
+    setErrors((e) => {
+      if (!(key in e)) return e;
+      const { [key]: _, ...rest } = e;
+      return rest;
+    });
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

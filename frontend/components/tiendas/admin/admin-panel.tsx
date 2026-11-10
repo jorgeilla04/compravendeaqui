@@ -103,7 +103,21 @@ export function TiendaAdminPanel({ slug }: { slug: string }) {
         <GruposAdmin
           tienda={tienda}
           grupos={catalogo.grupos}
+          productos={catalogo.productos}
+          precios={catalogo.precios}
           onChange={(grupos) => setCatalogo({ ...catalogo, grupos })}
+          onPrecio={(precio) =>
+            setCatalogo({
+              ...catalogo,
+              precios: [
+                ...catalogo.precios.filter(
+                  (p) =>
+                    p.grupo !== precio.grupo || p.producto !== precio.producto,
+                ),
+                precio,
+              ],
+            })
+          }
         />
       ) : null}
       {seccion === "productos" ? (
