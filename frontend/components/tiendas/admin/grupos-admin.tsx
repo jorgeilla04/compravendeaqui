@@ -1,7 +1,9 @@
 "use client";
 
+import { Search } from "lucide-react";
 import * as React from "react";
 
+import { filterGrupos } from "@/components/tiendas/grupo-explorer";
 import { GrupoLogo } from "@/components/tiendas/grupo-logo";
 import { Button } from "@/components/ui/button";
 import { FormMessage, SelectField, TextField } from "@/components/ui/form";
@@ -456,6 +458,8 @@ export function GruposAdmin({
   onPrecio?: (precio: PrecioGrupo) => void;
 }) {
   const [formKey, setFormKey] = React.useState(0);
+  const [busqueda, setBusqueda] = React.useState("");
+  const visibles = filterGrupos(grupos, busqueda, null);
   const label = tienda.grupo_label.toLowerCase();
   const replace = (updated: GrupoAdmin) =>
     onChange(grupos.map((g) => (g.slug === updated.slug ? updated : g)));
@@ -502,10 +506,42 @@ export function GruposAdmin({
         <h3 id="lista-grupos" className="font-heading text-h3 font-semibold">
           {grupos.length} {grupos.length === 1 ? label : `${label}s`}
         </h3>
+        {grupos.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            <label htmlFor="buscar-grupo-admin" className="font-semibold">
+              Buscar {label}
+            </label>
+            <div className="relative">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                id="buscar-grupo-admin"
+                type="search"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Nombre o departamento"
+                autoComplete="off"
+                className="h-12 w-full rounded-input border border-border bg-card pl-10 pr-3 text-base text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            {busqueda.trim() ? (
+              <p role="status" className="text-meta text-muted-foreground">
+                {visibles.length === 0
+                  ? `Ningún ${label} coincide con "${busqueda.trim()}".`
+                  : `${visibles.length} de ${grupos.length}`}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <ul className="flex flex-col gap-3">
-          {grupos.map((grupo) => (
+          {visibles.map((grupo) => (
             <li key={grupo.slug}>
-              <details className="rounded-card border border-border bg-card">
+              <details
+                className="rounded-card border border-border bg-card"
+                open={(busqueda.trim() && visibles.length === 1) || undefined}
+              >
                 <summary className="flex min-h-14 cursor-pointer items-center gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <GrupoLogo grupo={grupo} size="sm" />
                   <span className="flex flex-col">
