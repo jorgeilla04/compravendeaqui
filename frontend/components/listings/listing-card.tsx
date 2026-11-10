@@ -27,7 +27,8 @@ export function ListingCard({
             alt=""
             fill
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-            className="object-cover"
+            // Entera y centrada: muchas fotos de producto no son 4:3.
+            className="bg-white object-contain p-2"
             priority={priority}
           />
         ) : (
