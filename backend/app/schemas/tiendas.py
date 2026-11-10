@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.constants import DEPARTMENTS
 from app.core.phone import InvalidPhoneError, normalize_ar_mobile
@@ -120,6 +120,38 @@ class TiendaOut(TiendaResumenOut):
     grupos: list[GrupoOut]
 
 
+class FilaMedidas(BaseModel):
+    talle: str = Field(min_length=1, max_length=10)
+    valores: list[float | None] = Field(max_length=5)
+
+
+class Medidas(BaseModel):
+    """Guía de talles de una prenda: medidas en cm por talle."""
+
+    columnas: list[str] = Field(min_length=1, max_length=5)
+    filas: list[FilaMedidas] = Field(min_length=1, max_length=40)
+    aproximadas: bool = True
+
+    @field_validator("columnas")
+    @classmethod
+    def _columnas(cls, value: list[str]) -> list[str]:
+        limpias = [c.strip() for c in value]
+        if any(not c or len(c) > 30 for c in limpias):
+            raise ValueError("Cada columna necesita un nombre de hasta 30 letras")
+        return limpias
+
+    @model_validator(mode="after")
+    def _valores(self) -> Medidas:
+        for fila in self.filas:
+            if len(fila.valores) != len(self.columnas):
+                raise ValueError(
+                    f"El talle {fila.talle} tiene que tener una medida por columna"
+                )
+            if any(v is not None and not 0 < v <= 300 for v in fila.valores):
+                raise ValueError(f"Revisá las medidas del talle {fila.talle}")
+        return self
+
+
 class ProductoOut(BaseModel):
     slug: str
     nombre: str
@@ -128,6 +160,7 @@ class ProductoOut(BaseModel):
     precio: Monto
     opciones: list[str]
     foto_url: str | None
+    medidas: Medidas | None = None
 
 
 class GrupoDetalleOut(GrupoOut):
@@ -367,6 +400,7 @@ class ProductoUpdateIn(BaseModel):
     opciones: list[str] | None = Field(default=None, max_length=40)
     orden: int | None = Field(default=None, ge=0, le=1000)
     activo: bool | None = None
+    medidas: Medidas | None = None
 
     @field_validator("opciones")
     @classmethod
@@ -384,6 +418,7 @@ class ProductoAdminOut(BaseModel):
     precio_base: Monto
     opciones: list[str]
     foto_url: str | None
+    medidas: Medidas | None = None
     orden: int
     activo: bool
 

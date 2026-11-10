@@ -390,7 +390,8 @@ def editar_producto(
     tienda = _tienda(db, user, slug)
     producto = service.get_producto(db, tienda, producto_slug)
     for key, value in body.model_dump(exclude_unset=True).items():
-        if value is not None or key == "descripcion":
+        # descripcion y medidas se pueden borrar mandando null.
+        if value is not None or key in ("descripcion", "medidas"):
             setattr(producto, key, value)
     db.commit()
     db.refresh(producto)

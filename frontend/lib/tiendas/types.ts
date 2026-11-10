@@ -52,6 +52,14 @@ export interface Tienda extends TiendaResumen, TiendaReglas {
   grupos: Grupo[];
 }
 
+/** Guía de talles: medidas de la prenda en cm, una fila por talle. */
+export interface Medidas {
+  columnas: string[];
+  filas: { talle: string; valores: (number | null)[] }[];
+  /** true mientras sean de referencia y no las medidas reales de la prenda. */
+  aproximadas: boolean;
+}
+
 export interface Producto {
   slug: string;
   nombre: string;
@@ -60,6 +68,7 @@ export interface Producto {
   precio: string;
   opciones: string[];
   foto_url: string | null;
+  medidas?: Medidas | null;
 }
 
 export interface GrupoDetalle extends Grupo {
@@ -160,6 +169,7 @@ export interface ProductoAdmin {
   precio_base: string;
   opciones: string[];
   foto_url: string | null;
+  medidas?: Medidas | null;
   orden: number;
   activo: boolean;
 }
