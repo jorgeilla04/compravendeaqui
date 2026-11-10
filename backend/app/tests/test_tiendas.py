@@ -1109,6 +1109,50 @@ def test_admin_producto_inactivo_y_opciones(
     assert next(p for p in productos if p["slug"] == "medias")["opciones"] == ["Única"]
 
 
+def test_guia_de_talles(
+    admin: TestClient, client: TestClient, colegio: dict[str, Any]
+) -> None:
+    url = f"{API}/uniformes/grupos/{colegio['slug']}"
+    remera = next(
+        p for p in client.get(url).json()["productos"] if p["slug"] == "remera"
+    )
+    # Medidas de referencia cargadas por la migración, en el orden de los talles.
+    assert remera["medidas"]["columnas"][0] == "Largo total"
+    assert remera["medidas"]["aproximadas"] is True
+    assert [f["talle"] for f in remera["medidas"]["filas"]][:2] == ["4", "6"]
+
+    propias = {
+        "columnas": ["Largo", "Ancho"],
+        "filas": [
+            {"talle": "4", "valores": [45, 34]},
+            {"talle": "6", "valores": [48, None]},
+        ],
+        "aproximadas": False,
+    }
+    r = admin.put(f"{ADMIN}/uniformes/productos/remera", json={"medidas": propias})
+    assert r.status_code == 200, r.text
+    assert r.json()["medidas"]["filas"][1]["valores"] == [48, None]
+    remera = next(
+        p for p in client.get(url).json()["productos"] if p["slug"] == "remera"
+    )
+    assert remera["medidas"]["aproximadas"] is False
+
+    # Una fila con menos medidas que columnas no se guarda.
+    malas = {**propias, "filas": [{"talle": "4", "valores": [45]}]}
+    assert (
+        admin.put(
+            f"{ADMIN}/uniformes/productos/remera", json={"medidas": malas}
+        ).status_code
+        == 422
+    )
+    # null borra la guía.
+    admin.put(f"{ADMIN}/uniformes/productos/remera", json={"medidas": None})
+    remera = next(
+        p for p in client.get(url).json()["productos"] if p["slug"] == "remera"
+    )
+    assert remera["medidas"] is None
+
+
 # --- Scripts ------------------------------------------------------------------
 
 

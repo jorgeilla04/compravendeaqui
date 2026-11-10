@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { GuiaTallesEditor } from "@/components/tiendas/admin/guia-talles-editor";
 import { Button } from "@/components/ui/button";
 import {
   FormMessage,
@@ -296,6 +297,7 @@ function ProductoRow({
           }}
         />
       </label>
+      <GuiaTallesEditor slug={slug} producto={producto} onSaved={onSaved} />
       {message ? (
         <p className="text-meta text-success" role="status">
           {message}

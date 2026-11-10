@@ -4,6 +4,7 @@ import { Check, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
+import { GuiaTalles } from "@/components/tiendas/guia-talles";
 import { ProductoIlustracion } from "@/components/tiendas/producto-ilustracion";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/form";
@@ -112,6 +113,13 @@ export function ProductoCard({
               </option>
             ))}
           </SelectField>
+        ) : null}
+        {producto.medidas && producto.medidas.filas.length > 0 ? (
+          <GuiaTalles
+            prenda={producto.nombre}
+            medidas={producto.medidas}
+            seleccionado={opcion}
+          />
         ) : null}
         <div className="flex items-center gap-3">
           <span id={`${id}-cantidad`} className="text-meta font-semibold">

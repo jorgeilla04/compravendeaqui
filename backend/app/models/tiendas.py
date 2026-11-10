@@ -11,6 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -126,6 +127,9 @@ class Producto(UUIDPrimaryKeyMixin, Base):
     # Talles, colores... ([] = sin opciones).
     opciones: Mapped[list[str]] = mapped_column(JSON)
     foto_url: Mapped[str | None] = mapped_column(Text)
+    # Guía de talles: {"columnas": [...], "filas": [{"talle", "valores"}],
+    # "aproximadas": bool}. Medidas de la prenda en cm.
+    medidas: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     orden: Mapped[int] = mapped_column(Integer, default=0)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
 

@@ -168,6 +168,7 @@ def grupo(slug: str, grupo_slug: str, db: DbSession) -> GrupoDetalleOut:
                 precio=pp.precio,
                 opciones=pp.producto.opciones,
                 foto_url=pp.foto_url,
+                medidas=pp.producto.medidas,
             )
             for pp in service.productos_de(db, found_tienda, found)
         ],
