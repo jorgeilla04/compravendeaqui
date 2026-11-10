@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import DbSession
@@ -20,6 +20,7 @@ from app.schemas.tiendas import (
     PedidoItemOut,
     PedidoOut,
     ProductoOut,
+    TiendaBusquedaOut,
     TiendaOut,
     TiendaResumenOut,
 )
@@ -80,6 +81,22 @@ def pedido_out(pedido: Pedido, model: type[PedidoOut] = PedidoOut) -> Any:
 @router.get("", response_model=list[TiendaResumenOut])
 def tiendas(db: DbSession) -> list[TiendaResumenOut]:
     return [TiendaResumenOut.model_validate(t) for t in service.list_tiendas(db)]
+
+
+@router.get("/buscar", response_model=list[TiendaBusquedaOut])
+def buscar(
+    db: DbSession, q: str = Query(default="", max_length=100)
+) -> list[TiendaBusquedaOut]:
+    """Tiendas y grupos (colegios) que coinciden con la búsqueda del sitio."""
+    return [
+        TiendaBusquedaOut(
+            tienda=TiendaResumenOut.model_validate(e.tienda),
+            grupo_label=e.tienda.grupo_label,
+            grupos=[GrupoOut.model_validate(g) for g in e.grupos],
+            total_grupos=e.total_grupos,
+        )
+        for e in service.buscar(db, q)
+    ]
 
 
 @router.get("/pedidos/{pedido_id}", response_model=PedidoOut)

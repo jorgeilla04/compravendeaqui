@@ -97,6 +97,15 @@ class GrupoOut(BaseModel):
     logo_url: str | None
 
 
+class TiendaBusquedaOut(BaseModel):
+    """Una tienda que coincide con la búsqueda y sus grupos que coinciden."""
+
+    tienda: TiendaResumenOut
+    grupo_label: str
+    grupos: list[GrupoOut]
+    total_grupos: int
+
+
 class TiendaOut(TiendaResumenOut):
     """Lo que necesita el catálogo y el carrito (sin el email del dueño)."""
 

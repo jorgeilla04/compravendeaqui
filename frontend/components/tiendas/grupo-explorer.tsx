@@ -1,10 +1,9 @@
 "use client";
 
 import { Search } from "lucide-react";
-import Link from "next/link";
 import * as React from "react";
 
-import { GrupoLogo } from "@/components/tiendas/grupo-logo";
+import { GrupoCard } from "@/components/tiendas/grupo-card";
 import { cn } from "@/lib/utils";
 import type { Grupo, Tienda } from "@/lib/tiendas/types";
 
@@ -153,37 +152,7 @@ export function GrupoExplorer({ tienda }: { tienda: Tienda }) {
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {group.grupos.map((grupo) => (
                 <li key={grupo.slug}>
-                  <Link
-                    href={`/tiendas/${tienda.slug}/${grupo.slug}`}
-                    className="flex min-h-20 items-center gap-3 rounded-card border border-border bg-card p-3 transition-colors duration-200 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <span className="flex w-28 shrink-0 justify-center">
-                      <GrupoLogo grupo={grupo} />
-                    </span>
-                    <span className="flex min-w-0 flex-col">
-                      <span className="font-semibold text-foreground">
-                        {grupo.nombre}
-                      </span>
-                      {grupo.subtitulo ? (
-                        <span className="text-meta text-muted-foreground">
-                          {grupo.subtitulo}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span
-                      aria-hidden="true"
-                      className="ml-auto flex shrink-0 -space-x-1.5"
-                    >
-                      <span
-                        className="size-5 rounded-full border border-border"
-                        style={{ background: grupo.color1 }}
-                      />
-                      <span
-                        className="size-5 rounded-full border border-border"
-                        style={{ background: grupo.color2 }}
-                      />
-                    </span>
-                  </Link>
+                  <GrupoCard tienda={tienda.slug} grupo={grupo} />
                 </li>
               ))}
             </ul>

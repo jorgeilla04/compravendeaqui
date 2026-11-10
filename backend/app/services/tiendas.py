@@ -191,6 +191,76 @@ def get_grupo(
     return grupo
 
 
+# --- Búsqueda -----------------------------------------------------------------
+
+_VACIAS = {"a", "al", "con", "de", "del", "el", "en", "la", "las", "los", "para", "y"}
+# Palabras que la gente usa para referirse a un tipo de grupo.
+_SINONIMOS = {"colegio": "escuela escolar instituto colegio"}
+
+
+def _raices(text: str) -> list[str]:
+    """Palabras sin acentos ni plural ("Colegios" -> "colegio")."""
+    raices = []
+    for palabra in slugify(text).split("-"):
+        if len(palabra) < 2 or palabra in _VACIAS:
+            continue
+        if len(palabra) > 4 and palabra.endswith("es"):
+            palabra = palabra[:-2]
+        elif len(palabra) > 3 and palabra.endswith("s"):
+            palabra = palabra[:-1]
+        raices.append(palabra)
+    return raices
+
+
+def _contiene(vocabulario: list[str], raiz: str) -> bool:
+    """La raíz es el comienzo de una palabra, o al revés ("uniform" y
+    "uniforme")."""
+    return any(
+        v.startswith(raiz) or (len(v) >= 4 and raiz.startswith(v)) for v in vocabulario
+    )
+
+
+@dataclass
+class TiendaEncontrada:
+    tienda: Tienda
+    grupos: list[Grupo]
+    total_grupos: int
+
+
+def buscar(db: Session, q: str, *, limite: int = 12) -> list[TiendaEncontrada]:
+    """Tiendas y grupos (colegios) para la búsqueda general del sitio.
+
+    Las palabras que nombran a la tienda o a sus grupos ("uniformes",
+    "colegios") la traen entera; el resto tiene que estar en el grupo
+    ("san pablo", "don bosco", "rivadavia")."""
+    raices = _raices(q)[:6]  # acota el trabajo por búsqueda
+    if not raices:
+        return []
+    encontradas = []
+    for tienda in list_tiendas(db):
+        label = tienda.grupo_label.lower()
+        vocabulario = _raices(
+            f"{tienda.nombre} {label} {_SINONIMOS.get(slugify(label), '')}"
+        )
+        resto = [r for r in raices if not _contiene(vocabulario, r)]
+        grupos = list_grupos(db, tienda)
+        if resto:
+            grupos = [
+                g
+                for g in grupos
+                if (
+                    palabras := _raices(
+                        f"{g.nombre} {g.subtitulo or ''} {g.categoria or ''}"
+                    )
+                )
+                and all(_contiene(palabras, r) for r in resto)
+            ]
+            if not grupos and len(resto) == len(raices):
+                continue
+        encontradas.append(TiendaEncontrada(tienda, grupos[:limite], len(grupos)))
+    return encontradas
+
+
 def list_productos(
     db: Session, tienda: Tienda, *, include_inactive: bool = False
 ) -> list[Producto]:
