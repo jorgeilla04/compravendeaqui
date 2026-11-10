@@ -682,7 +682,10 @@ function EditarGrupo({
             id={`${base}-panel-datos`}
             aria-labelledby={`${base}-tab-datos`}
             hidden={pestana !== "datos"}
-            className="flex flex-col gap-6 pb-4"
+            // Sin "flex" mientras está oculta: display:flex le ganaría a hidden.
+            className={
+              pestana === "datos" ? "flex flex-col gap-6 pb-4" : undefined
+            }
           >
             <GrupoForm
               tienda={tienda}
