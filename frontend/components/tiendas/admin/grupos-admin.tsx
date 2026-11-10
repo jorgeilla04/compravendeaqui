@@ -1,13 +1,21 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { ImageUp, Search } from "lucide-react";
 import * as React from "react";
 
 import { filterGrupos } from "@/components/tiendas/grupo-explorer";
 import { GrupoLogo } from "@/components/tiendas/grupo-logo";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FormMessage, SelectField, TextField } from "@/components/ui/form";
 import { api, errorMessage } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type {
   GrupoAdmin,
   PrecioGrupo,
@@ -292,92 +300,63 @@ function GaleriaGrupo({
   );
 }
 
-function FotoProductoEnGrupo({
+type Fila = { precio: string; suspendido: boolean };
+
+function filaInicial(
+  precio: PrecioGrupo | undefined,
+  porDefecto: boolean,
+): Fila {
+  return {
+    precio: precio?.precio ? String(Number(precio.precio)) : "",
+    suspendido: !(precio?.disponible ?? porDefecto),
+  };
+}
+
+function FotoProducto({
   slug,
   grupo,
   producto,
   precio,
-  porDefecto,
   onPrecio,
 }: {
   slug: string;
   grupo: GrupoAdmin;
   producto: ProductoAdmin;
   precio: PrecioGrupo | undefined;
-  porDefecto: boolean;
   onPrecio: (p: PrecioGrupo) => void;
 }) {
   const { error, busy, run } = useUpload<PrecioGrupo>();
+  const inputRef = React.useRef<HTMLInputElement>(null);
   const path = `/admin/tiendas/${slug}/grupos/${grupo.slug}/productos/${producto.slug}/foto`;
   const propia = precio?.foto_url ?? null;
-  const id = `foto-${grupo.slug}-${producto.slug}`;
-  const [monto, setMonto] = React.useState(
-    precio?.precio ? String(Number(precio.precio)) : "",
-  );
-  const [disponible, setDisponible] = React.useState(
-    precio?.disponible ?? porDefecto,
-  );
-  const [status, setStatus] = React.useState<{
-    ok: boolean;
-    text: string;
-  } | null>(null);
-  const [saving, setSaving] = React.useState(false);
-
-  async function guardarPrecio() {
-    setStatus(null);
-    setSaving(true);
-    try {
-      onPrecio(
-        await api<PrecioGrupo>(`/admin/tiendas/${slug}/precios`, {
-          method: "PUT",
-          body: {
-            grupo: grupo.slug,
-            producto: producto.slug,
-            precio: monto || null,
-            disponible,
-          },
-        }),
-      );
-      setStatus({ ok: true, text: "Guardado." });
-    } catch (err) {
-      setStatus({ ok: false, text: errorMessage(err) });
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
-    <li className="flex flex-col gap-3 rounded-card border border-border p-3">
-      <div className="flex items-center gap-3">
-        <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-input border border-border bg-muted">
-          {propia ? (
-            // eslint-disable-next-line @next/next/no-img-element -- foto del bucket
-            <img src={propia} alt="" className="size-full object-contain" />
-          ) : (
-            <span className="text-caption text-muted-foreground">—</span>
-          )}
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <label htmlFor={id} className="text-meta font-semibold">
-            {producto.nombre}
-            <span className="font-normal text-muted-foreground">
-              {propia ? " · foto de este colegio" : " · usa la foto general"}
-            </span>
-          </label>
-          <input
-            id={id}
-            type="file"
-            accept={IMAGENES}
-            disabled={busy}
-            className="text-meta"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) void run(path, { method: "POST", file }, onPrecio);
-            }}
-          />
-          {error ? <FormMessage>{error}</FormMessage> : null}
-        </div>
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1">
+        <input
+          ref={inputRef}
+          type="file"
+          accept={IMAGENES}
+          aria-label={`Foto de ${producto.nombre} en ${grupo.nombre}`}
+          tabIndex={-1}
+          className="sr-only"
+          disabled={busy}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void run(path, { method: "POST", file }, onPrecio);
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={() => inputRef.current?.click()}
+          aria-label={`${propia ? "Cambiar" : "Subir"} foto de ${producto.nombre}`}
+        >
+          <ImageUp aria-hidden="true" />
+          {busy ? "Subiendo…" : propia ? "Cambiar" : "Subir foto"}
+        </Button>
         {propia ? (
           <Button
             type="button"
@@ -391,56 +370,381 @@ function FotoProductoEnGrupo({
           </Button>
         ) : null}
       </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <label
-          htmlFor={`${id}-precio`}
-          className="flex flex-col gap-1 text-meta font-semibold"
-        >
-          Precio en este colegio ($)
-          <input
-            id={`${id}-precio`}
-            type="number"
-            inputMode="numeric"
-            min={0}
-            step={100}
-            placeholder={`${Number(producto.precio_base)} (base)`}
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            className="h-11 w-40 rounded-input border border-border bg-card px-3 text-base text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </label>
-        <label className="flex min-h-11 items-center gap-2 text-base">
-          <input
-            type="checkbox"
-            checked={disponible}
-            onChange={(e) => setDisponible(e.target.checked)}
-            className="size-5 accent-[var(--color-primary)]"
-          />
-          <span className="sr-only">{producto.nombre} </span>Lo vende
-        </label>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={saving}
-          onClick={guardarPrecio}
-          aria-label={`Guardar precio de ${producto.nombre}`}
-        >
-          {saving ? "Guardando…" : "Guardar precio"}
-        </Button>
-        {status ? (
-          <span
-            role="status"
-            className={
-              status.ok ? "text-meta text-accent" : "text-meta text-destructive"
-            }
-          >
-            {status.text}
-          </span>
-        ) : null}
-      </div>
-    </li>
+      {error ? <FormMessage>{error}</FormMessage> : null}
+    </div>
   );
 }
+
+function ProductosDelGrupo({
+  slug,
+  grupo,
+  productos,
+  precios,
+  porDefecto,
+  onPrecio,
+  onDirty,
+}: {
+  slug: string;
+  grupo: GrupoAdmin;
+  productos: ProductoAdmin[];
+  precios: PrecioGrupo[];
+  porDefecto: boolean;
+  onPrecio: (p: PrecioGrupo) => void;
+  onDirty: (dirty: boolean) => void;
+}) {
+  const precioDe = (producto: string) =>
+    precios.find((p) => p.grupo === grupo.slug && p.producto === producto);
+  const [guardadas, setGuardadas] = React.useState<Record<string, Fila>>(() =>
+    Object.fromEntries(
+      productos.map((p) => [p.slug, filaInicial(precioDe(p.slug), porDefecto)]),
+    ),
+  );
+  const [filas, setFilas] = React.useState(guardadas);
+  const [saving, setSaving] = React.useState(false);
+  const [message, setMessage] = React.useState<{
+    tone: "error" | "success";
+    text: string;
+  } | null>(null);
+  const cambiadas = productos.filter(
+    (p) =>
+      filas[p.slug].precio !== guardadas[p.slug].precio ||
+      filas[p.slug].suspendido !== guardadas[p.slug].suspendido,
+  );
+
+  React.useEffect(() => {
+    onDirty(cambiadas.length > 0);
+  }, [cambiadas.length, onDirty]);
+
+  function set(producto: string, cambio: Partial<Fila>) {
+    setMessage(null);
+    setFilas((f) => ({ ...f, [producto]: { ...f[producto], ...cambio } }));
+  }
+
+  async function guardar() {
+    setSaving(true);
+    setMessage(null);
+    const listas: Record<string, Fila> = {};
+    try {
+      for (const producto of cambiadas) {
+        const fila = filas[producto.slug];
+        onPrecio(
+          await api<PrecioGrupo>(`/admin/tiendas/${slug}/precios`, {
+            method: "PUT",
+            body: {
+              grupo: grupo.slug,
+              producto: producto.slug,
+              precio: fila.precio || null,
+              disponible: !fila.suspendido,
+            },
+          }),
+        );
+        listas[producto.slug] = fila;
+      }
+      setMessage({ tone: "success", text: "Guardamos los cambios." });
+    } catch (err) {
+      setMessage({ tone: "error", text: errorMessage(err) });
+    } finally {
+      setGuardadas((g) => ({ ...g, ...listas }));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-meta text-muted-foreground">
+        Precio vacío = usa el precio base. Marcá{" "}
+        <strong className="font-semibold">Suspendido</strong> si este colegio no
+        usa esa prenda: deja de aparecer en su página.
+      </p>
+      <div
+        role="table"
+        aria-label={`Productos de ${grupo.nombre}`}
+        className="flex flex-col divide-y divide-border rounded-card border border-border"
+      >
+        <div
+          role="row"
+          className="hidden gap-3 px-3 py-2 text-meta text-muted-foreground sm:grid sm:grid-cols-[3rem_minmax(0,1fr)_auto_9rem_7rem]"
+        >
+          <span role="columnheader" className="sr-only">
+            Foto
+          </span>
+          <span role="columnheader" className="col-start-2">
+            Producto
+          </span>
+          <span role="columnheader">Foto en este colegio</span>
+          <span role="columnheader">Precio ($)</span>
+          <span role="columnheader">Suspendido</span>
+        </div>
+        {productos.map((producto) => {
+          const fila = filas[producto.slug];
+          const precio = precioDe(producto.slug);
+          const foto = precio?.foto_url ?? producto.foto_url;
+          const id = `fila-${grupo.slug}-${producto.slug}`;
+          return (
+            <div
+              key={producto.slug}
+              role="row"
+              className={cn(
+                "grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-3 py-2 sm:grid-cols-[3rem_minmax(0,1fr)_auto_9rem_7rem]",
+                fila.suspendido && "bg-muted/60",
+              )}
+            >
+              <span
+                role="cell"
+                className="flex size-12 items-center justify-center overflow-hidden rounded-input border border-border bg-muted"
+              >
+                {foto ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- foto del bucket
+                  <img src={foto} alt="" className="size-full object-contain" />
+                ) : (
+                  <span className="text-caption text-muted-foreground">—</span>
+                )}
+              </span>
+              <span role="rowheader" className="flex min-w-0 flex-col">
+                <span
+                  className={cn(
+                    "truncate font-semibold",
+                    fila.suspendido && "text-muted-foreground line-through",
+                  )}
+                >
+                  {producto.nombre}
+                </span>
+                <span className="text-caption text-muted-foreground">
+                  {precio?.foto_url ? "Foto de este colegio" : "Foto general"}
+                </span>
+              </span>
+              <span role="cell" className="col-span-2 sm:col-span-1">
+                <FotoProducto
+                  slug={slug}
+                  grupo={grupo}
+                  producto={producto}
+                  precio={precio}
+                  onPrecio={onPrecio}
+                />
+              </span>
+              <span role="cell">
+                <label htmlFor={`${id}-precio`} className="sr-only">
+                  Precio de {producto.nombre}
+                </label>
+                <input
+                  id={`${id}-precio`}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={100}
+                  placeholder={String(Number(producto.precio_base))}
+                  value={fila.precio}
+                  disabled={saving}
+                  onChange={(e) =>
+                    set(producto.slug, { precio: e.target.value })
+                  }
+                  className="h-11 w-full rounded-input border border-border bg-card px-3 text-base text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </span>
+              <span role="cell">
+                <label className="flex min-h-11 items-center gap-2 text-base">
+                  <input
+                    type="checkbox"
+                    checked={fila.suspendido}
+                    aria-label={`Suspender ${producto.nombre}`}
+                    disabled={saving}
+                    onChange={(e) =>
+                      set(producto.slug, { suspendido: e.target.checked })
+                    }
+                    className="size-5 accent-[var(--color-primary)]"
+                  />
+                  <span aria-hidden="true" className="sm:sr-only">
+                    Suspendido
+                  </span>
+                </label>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="sticky bottom-0 flex flex-col gap-2 border-t border-border bg-card py-3 sm:flex-row sm:items-center">
+        <Button
+          type="button"
+          variant="primary"
+          disabled={saving || cambiadas.length === 0}
+          onClick={guardar}
+        >
+          {saving
+            ? "Guardando…"
+            : cambiadas.length > 0
+              ? `Guardar cambios (${cambiadas.length})`
+              : "Guardar cambios"}
+        </Button>
+        {message ? (
+          <FormMessage tone={message.tone}>{message.text}</FormMessage>
+        ) : cambiadas.length > 0 ? (
+          <p className="text-meta text-muted-foreground">
+            Tenés cambios sin guardar.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+type Pestana = "datos" | "productos";
+
+function EditarGrupo({
+  tienda,
+  grupo,
+  productos,
+  precios,
+  onClose,
+  onChange,
+  onPrecio,
+}: {
+  tienda: TiendaAdmin;
+  grupo: GrupoAdmin;
+  productos: ProductoAdmin[];
+  precios: PrecioGrupo[];
+  onClose: () => void;
+  onChange: (g: GrupoAdmin) => void;
+  onPrecio: (p: PrecioGrupo) => void;
+}) {
+  const [pestana, setPestana] = React.useState<Pestana>("datos");
+  const [dirty, setDirty] = React.useState(false);
+  const pestanas: { id: Pestana; label: string }[] = [
+    { id: "datos", label: "Datos y fotos" },
+    ...(productos.length > 0
+      ? [{ id: "productos" as const, label: "Productos y precios" }]
+      : []),
+  ];
+  const base = `editar-${grupo.slug}`;
+
+  function cerrar(open: boolean) {
+    if (open) return;
+    if (
+      dirty &&
+      !window.confirm("Tenés precios sin guardar. ¿Cerrar igual y perderlos?")
+    ) {
+      return;
+    }
+    onClose();
+  }
+
+  function teclas(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    const i = pestanas.findIndex((p) => p.id === pestana);
+    const delta = event.key === "ArrowRight" ? 1 : -1;
+    const next = pestanas[(i + delta + pestanas.length) % pestanas.length];
+    setPestana(next.id);
+    document.getElementById(`${base}-tab-${next.id}`)?.focus();
+  }
+
+  return (
+    <Dialog open onOpenChange={cerrar}>
+      <DialogContent className="flex max-h-[92vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="flex-row items-center gap-3 border-b border-border p-4 pr-14">
+          <GrupoLogo grupo={grupo} size="sm" />
+          <div className="flex min-w-0 flex-col">
+            <DialogTitle className="truncate">{grupo.nombre}</DialogTitle>
+            <DialogDescription>
+              {[grupo.subtitulo, grupo.categoria].filter(Boolean).join(" · ") ||
+                `Editá este ${tienda.grupo_label.toLowerCase()}`}
+            </DialogDescription>
+          </div>
+        </DialogHeader>
+        <div
+          role="tablist"
+          aria-label="Secciones"
+          onKeyDown={teclas}
+          className="flex gap-1 border-b border-border px-4"
+        >
+          {pestanas.map((p) => (
+            <button
+              key={p.id}
+              id={`${base}-tab-${p.id}`}
+              type="button"
+              role="tab"
+              aria-selected={pestana === p.id}
+              aria-controls={`${base}-panel-${p.id}`}
+              tabIndex={pestana === p.id ? 0 : -1}
+              onClick={() => setPestana(p.id)}
+              className={cn(
+                "-mb-px min-h-11 border-b-2 px-3 text-base font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                pestana === p.id
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="overflow-y-auto px-4 pt-4">
+          <div
+            role="tabpanel"
+            id={`${base}-panel-datos`}
+            aria-labelledby={`${base}-tab-datos`}
+            hidden={pestana !== "datos"}
+            className="flex flex-col gap-6 pb-4"
+          >
+            <GrupoForm
+              tienda={tienda}
+              idPrefix={grupo.slug}
+              submitLabel="Guardar datos"
+              initial={{
+                nombre: grupo.nombre,
+                subtitulo: grupo.subtitulo ?? "",
+                categoria: grupo.categoria ?? "",
+                color1: grupo.color1,
+                color2: grupo.color2,
+                activo: grupo.activo,
+              }}
+              onSubmit={async (draft) =>
+                onChange(
+                  await api<GrupoAdmin>(
+                    `/admin/tiendas/${tienda.slug}/grupos/${grupo.slug}`,
+                    { method: "PUT", body: toBody(draft) },
+                  ),
+                )
+              }
+            />
+            <LogoUpload
+              slug={tienda.slug}
+              grupo={grupo}
+              onUploaded={onChange}
+            />
+            <GaleriaGrupo
+              slug={tienda.slug}
+              grupo={grupo}
+              onChange={onChange}
+            />
+          </div>
+          {productos.length > 0 ? (
+            <div
+              role="tabpanel"
+              id={`${base}-panel-productos`}
+              aria-labelledby={`${base}-tab-productos`}
+              hidden={pestana !== "productos"}
+            >
+              <ProductosDelGrupo
+                slug={tienda.slug}
+                grupo={grupo}
+                productos={productos}
+                precios={precios}
+                porDefecto={tienda.productos_en_todos}
+                onPrecio={onPrecio}
+                onDirty={setDirty}
+              />
+            </div>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const toBody = (d: Draft) => ({
+  ...d,
+  subtitulo: d.subtitulo.trim() || null,
+  categoria: d.categoria || null,
+});
 
 export function GruposAdmin({
   tienda,
@@ -459,15 +763,12 @@ export function GruposAdmin({
 }) {
   const [formKey, setFormKey] = React.useState(0);
   const [busqueda, setBusqueda] = React.useState("");
+  const [abierto, setAbierto] = React.useState<string | null>(null);
   const visibles = filterGrupos(grupos, busqueda, null);
   const label = tienda.grupo_label.toLowerCase();
+  const editando = grupos.find((g) => g.slug === abierto);
   const replace = (updated: GrupoAdmin) =>
     onChange(grupos.map((g) => (g.slug === updated.slug ? updated : g)));
-  const toBody = (d: Draft) => ({
-    ...d,
-    subtitulo: d.subtitulo.trim() || null,
-    categoria: d.categoria || null,
-  });
 
   return (
     <div className="flex flex-col gap-8">
@@ -535,91 +836,44 @@ export function GruposAdmin({
             ) : null}
           </div>
         ) : null}
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col gap-2">
           {visibles.map((grupo) => (
             <li key={grupo.slug}>
-              <details
-                className="rounded-card border border-border bg-card"
-                open={(busqueda.trim() && visibles.length === 1) || undefined}
+              <button
+                type="button"
+                onClick={() => setAbierto(grupo.slug)}
+                className="flex min-h-14 w-full items-center gap-3 rounded-card border border-border bg-card p-3 text-left transition-colors duration-200 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <summary className="flex min-h-14 cursor-pointer items-center gap-3 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <GrupoLogo grupo={grupo} size="sm" />
-                  <span className="flex flex-col">
-                    <span className="font-semibold">{grupo.nombre}</span>
-                    <span className="text-meta text-muted-foreground">
-                      {[grupo.subtitulo, grupo.categoria]
-                        .filter(Boolean)
-                        .join(" · ")}
-                      {grupo.activo ? "" : " · Oculto"}
-                    </span>
+                <GrupoLogo grupo={grupo} size="sm" />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="font-semibold">{grupo.nombre}</span>
+                  <span className="text-meta text-muted-foreground">
+                    {[grupo.subtitulo, grupo.categoria]
+                      .filter(Boolean)
+                      .join(" · ")}
+                    {grupo.activo ? "" : " · Oculto"}
                   </span>
-                </summary>
-                <div className="flex flex-col gap-4 border-t border-border p-3">
-                  <GrupoForm
-                    tienda={tienda}
-                    idPrefix={grupo.slug}
-                    submitLabel="Guardar cambios"
-                    initial={{
-                      nombre: grupo.nombre,
-                      subtitulo: grupo.subtitulo ?? "",
-                      categoria: grupo.categoria ?? "",
-                      color1: grupo.color1,
-                      color2: grupo.color2,
-                      activo: grupo.activo,
-                    }}
-                    onSubmit={async (draft) =>
-                      replace(
-                        await api<GrupoAdmin>(
-                          `/admin/tiendas/${tienda.slug}/grupos/${grupo.slug}`,
-                          { method: "PUT", body: toBody(draft) },
-                        ),
-                      )
-                    }
-                  />
-                  <LogoUpload
-                    slug={tienda.slug}
-                    grupo={grupo}
-                    onUploaded={replace}
-                  />
-                  <GaleriaGrupo
-                    slug={tienda.slug}
-                    grupo={grupo}
-                    onChange={replace}
-                  />
-                  {productos.length > 0 ? (
-                    <fieldset className="flex flex-col gap-2">
-                      <legend className="text-meta font-semibold">
-                        Precio y foto de cada producto en {grupo.nombre}
-                      </legend>
-                      <p className="text-meta text-muted-foreground">
-                        Precio vacío = usa el precio base de &quot;Productos y
-                        precios&quot;.
-                      </p>
-                      <ul className="flex flex-col gap-3">
-                        {productos.map((producto) => (
-                          <FotoProductoEnGrupo
-                            key={producto.slug}
-                            slug={tienda.slug}
-                            grupo={grupo}
-                            producto={producto}
-                            precio={precios.find(
-                              (p) =>
-                                p.grupo === grupo.slug &&
-                                p.producto === producto.slug,
-                            )}
-                            porDefecto={tienda.productos_en_todos}
-                            onPrecio={onPrecio}
-                          />
-                        ))}
-                      </ul>
-                    </fieldset>
-                  ) : null}
-                </div>
-              </details>
+                </span>
+                <span className="text-meta font-semibold text-primary">
+                  Editar
+                </span>
+              </button>
             </li>
           ))}
         </ul>
       </section>
+      {editando ? (
+        <EditarGrupo
+          key={editando.slug}
+          tienda={tienda}
+          grupo={editando}
+          productos={productos}
+          precios={precios}
+          onClose={() => setAbierto(null)}
+          onChange={replace}
+          onPrecio={onPrecio}
+        />
+      ) : null}
     </div>
   );
 }

@@ -885,14 +885,27 @@ describe("administración de tiendas", () => {
     ).toBeVisible();
   });
 
-  it("carga fotos del uniforme y de cada producto por colegio", async () => {
+  it("edita un colegio en una ventana con pestañas", async () => {
     const user = userEvent.setup();
     const base = "/admin/tiendas/uniformes/grupos/santa-rosa";
     const calls = mockApi({
       "GET /auth/me": () => ({ status: 200, json: me("user") }),
       "GET /admin/tiendas/uniformes/catalogo": () => ({
         status: 200,
-        json: catalogo,
+        json: {
+          ...catalogo,
+          grupos: [
+            ...catalogo.grupos,
+            {
+              ...santaRosa,
+              slug: "san-pablo",
+              nombre: "Colegio San Pablo",
+              subtitulo: "Rivadavia",
+              activo: true,
+              fotos: [],
+            },
+          ],
+        },
       }),
       "GET /admin/tiendas/uniformes/pedidos": () => ({ status: 200, json: [] }),
       [`POST ${base}/fotos`]: () => ({
@@ -923,99 +936,98 @@ describe("administración de tiendas", () => {
     });
     renderPanel();
     await user.click(await screen.findByRole("button", { name: "Colegios" }));
-    await user.click(screen.getByText("Colegio Santa Rosa de Lima"));
-    const archivo = new File(["x"], "uniforme.png", { type: "image/png" });
 
-    await user.upload(screen.getByLabelText("Agregar foto"), archivo);
-    expect(
-      await screen.findByRole("img", {
-        name: "Foto 1 de Colegio Santa Rosa de Lima",
-      }),
-    ).toHaveAttribute("src", "https://cdn.test/uniforme.webp");
-    expect(
-      calls.find((c) => c.key === `POST ${base}/fotos`)?.body,
-    ).toBeInstanceOf(FormData);
-
-    await user.upload(
-      screen.getByLabelText(/Remera \/ chomba · usa la foto general/),
-      archivo,
-    );
-    expect(
-      await screen.findByLabelText(/Remera \/ chomba · foto de este colegio/),
-    ).toBeInTheDocument();
-
-    const precioRemera = screen.getByLabelText("Precio en este colegio ($)", {
-      selector: "#foto-santa-rosa-remera-precio",
-    });
-    await user.type(precioRemera, "12000");
-    await user.click(
-      screen.getByRole("button", { name: "Guardar precio de Remera / chomba" }),
-    );
-    expect(await screen.findByText("Guardado.")).toBeVisible();
-    expect(
-      calls.find((c) => c.key === "PUT /admin/tiendas/uniformes/precios")?.body,
-    ).toEqual({
-      grupo: "santa-rosa",
-      producto: "remera",
-      precio: "12000",
-      disponible: true,
-    });
-
-    await user.click(
-      screen.getByRole("button", {
-        name: "Quitar foto 1 de Colegio Santa Rosa de Lima",
-      }),
-    );
-    await waitFor(() =>
-      expect(
-        screen.queryByRole("img", {
-          name: "Foto 1 de Colegio Santa Rosa de Lima",
-        }),
-      ).not.toBeInTheDocument(),
-    );
-  });
-
-  it("busca colegios en el panel", async () => {
-    const user = userEvent.setup();
-    mockApi({
-      "GET /auth/me": () => ({ status: 200, json: me("user") }),
-      "GET /admin/tiendas/uniformes/catalogo": () => ({
-        status: 200,
-        json: {
-          ...catalogo,
-          grupos: [
-            ...catalogo.grupos,
-            {
-              ...santaRosa,
-              slug: "san-pablo",
-              nombre: "Colegio San Pablo",
-              subtitulo: "Rivadavia",
-              activo: true,
-              fotos: [],
-            },
-          ],
-        },
-      }),
-      "GET /admin/tiendas/uniformes/pedidos": () => ({ status: 200, json: [] }),
-    });
-    renderPanel();
-    await user.click(await screen.findByRole("button", { name: "Colegios" }));
-    expect(screen.getByText("Colegio Santa Rosa de Lima")).toBeVisible();
+    // El buscador achica la lista.
     const buscar = screen.getByLabelText("Buscar colegio");
     await user.type(buscar, "rivadavia");
     expect(screen.getByRole("status")).toHaveTextContent("1 de 2");
     expect(
       screen.queryByText("Colegio Santa Rosa de Lima"),
     ).not.toBeInTheDocument();
-    // Con un solo resultado ya queda abierto para editarlo.
-    expect(
-      screen.getByText("Colegio San Pablo").closest("details"),
-    ).toHaveAttribute("open");
     await user.clear(buscar);
     await user.type(buscar, "zzz");
     expect(screen.getByRole("status")).toHaveTextContent(
       'Ningún colegio coincide con "zzz".',
     );
+    await user.clear(buscar);
+
+    await user.click(
+      screen.getByRole("button", { name: /Colegio Santa Rosa de Lima/ }),
+    );
+    const ventana = screen.getByRole("dialog", {
+      name: "Colegio Santa Rosa de Lima",
+    });
+    expect(
+      within(ventana).getByRole("tab", { name: "Datos y fotos" }),
+    ).toHaveAttribute("aria-selected", "true");
+
+    const archivo = new File(["x"], "uniforme.png", { type: "image/png" });
+    await user.upload(within(ventana).getByLabelText("Agregar foto"), archivo);
+    expect(
+      await within(ventana).findByRole("img", {
+        name: "Foto 1 de Colegio Santa Rosa de Lima",
+      }),
+    ).toHaveAttribute("src", "https://cdn.test/uniforme.webp");
+    expect(
+      calls.find((c) => c.key === `POST ${base}/fotos`)?.body,
+    ).toBeInstanceOf(FormData);
+    await user.click(
+      within(ventana).getByRole("button", {
+        name: "Quitar foto 1 de Colegio Santa Rosa de Lima",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        within(ventana).queryByRole("img", {
+          name: "Foto 1 de Colegio Santa Rosa de Lima",
+        }),
+      ).not.toBeInTheDocument(),
+    );
+
+    await user.click(
+      within(ventana).getByRole("tab", { name: "Productos y precios" }),
+    );
+    await user.upload(
+      within(ventana).getByLabelText(
+        "Foto de Remera / chomba en Colegio Santa Rosa de Lima",
+      ),
+      archivo,
+    );
+    expect(
+      await within(ventana).findByText("Foto de este colegio"),
+    ).toBeInTheDocument();
+
+    const guardar = within(ventana).getByRole("button", {
+      name: /Guardar cambios/,
+    });
+    expect(guardar).toBeDisabled();
+    await user.type(
+      within(ventana).getByLabelText("Precio de Remera / chomba"),
+      "12000",
+    );
+    await user.click(
+      within(ventana).getByLabelText("Suspender Remera / chomba"),
+    );
+    await user.click(
+      within(ventana).getByRole("button", { name: "Guardar cambios (1)" }),
+    );
+    expect(
+      await within(ventana).findByText("Guardamos los cambios."),
+    ).toBeVisible();
+    expect(
+      calls.filter((c) => c.key === "PUT /admin/tiendas/uniformes/precios"),
+    ).toHaveLength(1);
+    expect(
+      calls.find((c) => c.key === "PUT /admin/tiendas/uniformes/precios")?.body,
+    ).toEqual({
+      grupo: "santa-rosa",
+      producto: "remera",
+      precio: "12000",
+      disponible: false,
+    });
+    expect(
+      within(ventana).getByRole("button", { name: "Guardar cambios" }),
+    ).toBeDisabled();
   });
 
   it("edita nombre y descripción de un producto", async () => {
