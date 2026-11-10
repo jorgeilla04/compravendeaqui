@@ -268,7 +268,7 @@ export function DemoPago({ tienda }: { tienda: Tienda }) {
               {resultado === "aprobado" ? (
                 <CheckCircle2
                   aria-hidden="true"
-                  className="size-5 text-accent"
+                  className="size-5 text-success"
                 />
               ) : resultado === "pendiente" ? (
                 <Clock aria-hidden="true" className="size-5" />

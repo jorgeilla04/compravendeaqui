@@ -133,7 +133,7 @@ export function SearchBar({
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         onKeyDown={onKeyDown}
-        className="h-11 w-full rounded-input border border-border bg-card pl-10 pr-24 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="h-11 w-full rounded-input border border-transparent bg-card pl-10 pr-24 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       <button
         type="submit"
@@ -146,7 +146,7 @@ export function SearchBar({
           id={listId}
           role="listbox"
           aria-label="Sugerencias"
-          className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-input border border-border bg-card py-1 shadow-md"
+          className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-input border border-border bg-card py-1 text-card-foreground shadow-md [--color-ring:var(--color-primary)]"
         >
           {options.map((option, index) => (
             <li

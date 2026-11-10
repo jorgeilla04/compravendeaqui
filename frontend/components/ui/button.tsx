@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Variantes de botón según DESIGN.md:
- * primary (azul), accent (verde CTA), whatsapp (verde WhatsApp — solo contacto),
+ * primary (rojo arenisca), accent (ocre: publicar y confirmar), whatsapp (verde WhatsApp — solo contacto),
  * ghost y destructive. Touch target mínimo 44px (h-11) en la variante default.
  */
 const buttonVariants = cva(

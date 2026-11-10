@@ -52,3 +52,11 @@ frontend/.next-e2e/
 frontend/playwright-report/
 frontend/test-results/
 loadtest/results_*.csv
+
+# Capturas y estado de trabajo de Impeccable
+.impeccable/review/
+.impeccable/build/
+.impeccable/mocks/
+.impeccable/config.local.json
+.impeccable/questions/
+.impeccable/hook.cache.json

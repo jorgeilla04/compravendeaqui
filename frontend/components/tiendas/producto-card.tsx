@@ -159,7 +159,7 @@ export function ProductoCard({
         </Button>
         <p aria-live="polite" className="min-h-6 text-meta">
           {added ? (
-            <span className="inline-flex flex-wrap items-center gap-1 font-semibold text-accent">
+            <span className="inline-flex flex-wrap items-center gap-1 font-semibold text-success">
               <Check aria-hidden="true" className="size-4" />
               {added}{" "}
               <Link

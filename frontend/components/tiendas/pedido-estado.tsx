@@ -93,7 +93,7 @@ export function PedidoEstado({ id }: { id: string }) {
   const head = {
     pagado: {
       icon: CheckCircle2,
-      tone: "text-accent",
+      tone: "text-success",
       title: "¡Listo! Recibimos tu pago",
       text:
         pedido.modalidad_pago === "sena"
@@ -102,7 +102,7 @@ export function PedidoEstado({ id }: { id: string }) {
     },
     a_coordinar: {
       icon: CheckCircle2,
-      tone: "text-accent",
+      tone: "text-success",
       title: "Recibimos tu pedido",
       text: `Te vamos a escribir por WhatsApp para coordinar el pago de ${pesosLabel(pedido.pagado_ahora)} y la entrega.`,
     },

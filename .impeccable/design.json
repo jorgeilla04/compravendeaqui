@@ -1,0 +1,440 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-10T15:41:27Z",
+  "title": "Design System: CompraVendeAqui",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Rojo arenisca",
+        "canonical": "#a3391e",
+        "dark": "#e8825f",
+        "tonalRamp": [
+          "#41170c",
+          "#6c2614",
+          "#97351c",
+          "#c24424",
+          "#de684a",
+          "#e7937e",
+          "#f2c2b6",
+          "#fbede9"
+        ]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Rojo arenisca profundo",
+        "canonical": "#842c15",
+        "dark": "#f09a7b",
+        "tonalRamp": [
+          "#42160a",
+          "#6e2511",
+          "#9a3318",
+          "#c64220",
+          "#e26646",
+          "#ea927b",
+          "#f3c1b4",
+          "#fbede9"
+        ]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Azul cielo de altura",
+        "canonical": "#1f4f8a",
+        "dark": "#8db3e8",
+        "tonalRamp": [
+          "#0e243e",
+          "#173c68",
+          "#215392",
+          "#2a6bbb",
+          "#508dd8",
+          "#82aee3",
+          "#b8d1ef",
+          "#eaf1fa"
+        ]
+      },
+      "accent": {
+        "role": "tertiary",
+        "displayName": "Ocre de Ischigualasto",
+        "canonical": "#e2a33b",
+        "dark": "#e8b04f",
+        "tonalRamp": [
+          "#432d0a",
+          "#6f4b10",
+          "#9b6a17",
+          "#c8881e",
+          "#e3a744",
+          "#ebc07a",
+          "#f4dcb3",
+          "#fcf5e9"
+        ]
+      },
+      "whatsapp": {
+        "role": "tertiary",
+        "displayName": "Verde WhatsApp (solo contacto)",
+        "canonical": "#25d366",
+        "dark": "#25d366",
+        "tonalRamp": [
+          "#0b411f",
+          "#136c34",
+          "#1b9849",
+          "#22c35e",
+          "#49df81",
+          "#7de8a5",
+          "#b5f2cc",
+          "#e9fbf0"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Gris arcilla",
+        "canonical": "#f3f1ee",
+        "dark": "#0d1424",
+        "tonalRamp": [
+          "#2d2820",
+          "#4b4235",
+          "#695c4a",
+          "#87775f",
+          "#a69881",
+          "#c0b5a5",
+          "#dbd5cc",
+          "#f4f3f0"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Umber",
+        "canonical": "#2a211c",
+        "dark": "#ede7e0",
+        "tonalRamp": [
+          "#2e241f",
+          "#4c3c33",
+          "#6b5447",
+          "#8a6c5c",
+          "#a98e7e",
+          "#c2aea3",
+          "#dcd1cb",
+          "#f5f2f0"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Arcilla suave",
+        "canonical": "#eae5df",
+        "dark": "#1c2842",
+        "tonalRamp": [
+          "#2e271e",
+          "#4d4133",
+          "#6c5b47",
+          "#8b755b",
+          "#aa967e",
+          "#c2b4a3",
+          "#ddd4cb",
+          "#f5f2f0"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Umber apagado",
+        "canonical": "#6b5d53",
+        "dark": "#a9b4c9",
+        "tonalRamp": [
+          "#2b2521",
+          "#483e38",
+          "#65574e",
+          "#817064",
+          "#a19286",
+          "#bcb1a9",
+          "#d9d3ce",
+          "#f4f2f1"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Blanco tarjeta",
+        "canonical": "#ffffff",
+        "dark": "#151f35",
+        "tonalRamp": [
+          "#262626",
+          "#404040",
+          "#595959",
+          "#737373",
+          "#949494",
+          "#b2b2b2",
+          "#d4d4d4",
+          "#f2f2f2"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Borde arcilla",
+        "canonical": "#e0d8cf",
+        "dark": "#2a3754",
+        "tonalRamp": [
+          "#2e271e",
+          "#4d4132",
+          "#6c5a46",
+          "#8b745a",
+          "#ab957d",
+          "#c3b3a2",
+          "#ddd4ca",
+          "#f5f2f0"
+        ]
+      },
+      "destructive": {
+        "role": "error",
+        "displayName": "Rojo error",
+        "canonical": "#b42318",
+        "dark": "#f87171",
+        "tonalRamp": [
+          "#440d09",
+          "#70160f",
+          "#9d1f15",
+          "#ca271b",
+          "#e64e42",
+          "#ed8078",
+          "#f5b7b2",
+          "#fceae8"
+        ]
+      },
+      "header": {
+        "role": "secondary",
+        "displayName": "Azul noche",
+        "canonical": "#16233f",
+        "dark": "#0a1020",
+        "tonalRamp": [
+          "#142039",
+          "#21345e",
+          "#2e4a84",
+          "#3b5eaa",
+          "#6081c8",
+          "#8ea5d7",
+          "#bfcce9",
+          "#ecf0f8"
+        ]
+      },
+      "header-muted": {
+        "role": "secondary",
+        "displayName": "Azul noche apagado",
+        "canonical": "#b8c3d9",
+        "dark": "#9aa8c2",
+        "tonalRamp": [
+          "#1b2232",
+          "#2c3953",
+          "#3e5074",
+          "#506795",
+          "#7389b4",
+          "#9babca",
+          "#c7cfe1",
+          "#eef1f6"
+        ]
+      },
+      "scrim": {
+        "role": "neutral",
+        "displayName": "Velo azul noche",
+        "canonical": "rgb(14 22 42)",
+        "purpose": "Velos sobre fotos con alfa explícito (.4-.92); nunca via modificador /NN de Tailwind."
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Titular del carrusel: Rubik 700, 28px mobile, 36px desde sm, text-balance."
+      },
+      "h1": {
+        "displayName": "H1",
+        "purpose": "Banda de cierre y títulos de página."
+      },
+      "h2": {
+        "displayName": "H2",
+        "purpose": "Títulos de filas y secciones de portada."
+      },
+      "h3": {
+        "displayName": "H3",
+        "purpose": "Precio en tarjeta, logo, botones lg."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texto corriente, Nunito Sans; max-w-prose en textos largos."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Departamento, Ver todos, nombres de rubro, accesos del header."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-sm",
+        "value": "0 1px 2px 0 rgb(42 33 28 / 0.06)",
+        "dark": "0 1px 2px 0 rgb(0 0 0 / 0.5)",
+        "purpose": "Tarjeta de aviso en reposo."
+      },
+      {
+        "name": "shadow",
+        "value": "0 2px 8px -1px rgb(42 33 28 / 0.09)",
+        "dark": "0 2px 8px -1px rgb(0 0 0 / 0.55)",
+        "purpose": "Flechas del carrusel, tarjeta de tienda en reposo."
+      },
+      {
+        "name": "shadow-md",
+        "value": "0 6px 16px -2px rgb(42 33 28 / 0.13)",
+        "dark": "0 6px 16px -2px rgb(0 0 0 / 0.6)",
+        "purpose": "Header sticky, carrusel, panel de rubros, menús, flechas de fila."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-soft",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Transiciones de botones."
+      },
+      {
+        "name": "duration-default",
+        "value": "200ms",
+        "purpose": "Cambios de color en hover."
+      },
+      {
+        "name": "carousel-fade",
+        "value": "700ms ease-out",
+        "purpose": "Fundido entre diapositivas."
+      },
+      {
+        "name": "carousel-zoom",
+        "value": "7000ms ease-out, scale 1.05 -> 1",
+        "purpose": "Zoom lento de la foto activa; intervalo de avance 7s."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "Con prefers-reduced-motion todo se apaga y el carrusel no avanza solo."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "xs",
+        "value": "480px"
+      },
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "container",
+        "value": "1152px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botón primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Toda acción que no sea publicar ni contactar.",
+      "html": "<button class=\"ds-btn-primary\">Ver electrodomésticos</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:8px 20px;border:none;border-radius:var(--radius-input,8px);background:var(--color-primary,#a3391e);color:var(--color-on-primary,#fff);font:600 1rem/1.5rem \"Nunito Sans\",system-ui,sans-serif;cursor:pointer;transition:background-color 200ms cubic-bezier(0.16,1,0.3,1)}.ds-btn-primary:hover{background:var(--color-primary-hover,#842c15)}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 2px var(--color-background,#f3f1ee),0 0 0 4px var(--color-ring,#a3391e)}"
+    },
+    {
+      "name": "Botón Publicar aviso (ocre)",
+      "kind": "button",
+      "refersTo": "button-accent",
+      "description": "Solo Publicar aviso y confirmaciones.",
+      "html": "<button class=\"ds-btn-accent\">Publicar aviso</button>",
+      "css": ".ds-btn-accent{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:8px 20px;border:none;border-radius:var(--radius-input,8px);background:var(--color-accent,#e2a33b);color:var(--color-on-accent,#2a1606);font:600 1rem/1.5rem \"Nunito Sans\",system-ui,sans-serif;cursor:pointer;transition:filter 200ms cubic-bezier(0.16,1,0.3,1)}.ds-btn-accent:hover{filter:brightness(0.95)}.ds-btn-accent:focus-visible{outline:none;box-shadow:0 0 0 2px var(--color-background,#f3f1ee),0 0 0 4px var(--color-ring,#a3391e)}"
+    },
+    {
+      "name": "Botón WhatsApp",
+      "kind": "button",
+      "refersTo": "button-whatsapp",
+      "description": "Único uso del verde: contacto por WhatsApp en el detalle.",
+      "html": "<button class=\"ds-btn-wa\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7.9 20A9 9 0 1 0 4 16.1L2 22Z\"/></svg>Contactar por WhatsApp</button>",
+      "css": ".ds-btn-wa{display:inline-flex;align-items:center;gap:8px;height:44px;padding:8px 20px;border:none;border-radius:9999px;background:var(--color-whatsapp,#25d366);color:var(--color-on-whatsapp,#052e16);font:600 1rem/1.5rem \"Nunito Sans\",system-ui,sans-serif;cursor:pointer;transition:filter 200ms}.ds-btn-wa:hover{filter:brightness(0.95)}.ds-btn-wa:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--color-ring,#a3391e)}"
+    },
+    {
+      "name": "Header (franja azul noche)",
+      "kind": "nav",
+      "refersTo": "header-band",
+      "description": "Franja sticky con logo, buscador blanco y Publicar aviso; foco claro dentro.",
+      "html": "<header class=\"ds-header\"><a class=\"ds-logo\" href=\"#\">CompraVende<span>Aqui</span></a><form class=\"ds-search\" role=\"search\"><label class=\"ds-sr\" for=\"ds-q\">Buscar avisos</label><input id=\"ds-q\" type=\"search\" placeholder=\"Buscar autos, celulares, casas…\"><button type=\"submit\">Buscar</button></form><a class=\"ds-hlink\" href=\"#\">Ingresar</a><a class=\"ds-publicar\" href=\"#\">Publicar aviso</a></header>",
+      "css": ".ds-header{--color-ring:var(--color-on-header,#f3f1ee);display:flex;align-items:center;gap:16px;padding:12px 16px;background:var(--color-header,#16233f);color:var(--color-on-header,#f3f1ee);box-shadow:0 6px 16px -2px rgb(42 33 28/.13)}.ds-logo{font:700 1.125rem/1.6rem Rubik,system-ui,sans-serif;letter-spacing:-.01em;color:inherit;text-decoration:none;border-radius:8px}.ds-logo span{color:var(--color-accent,#e2a33b)}.ds-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.ds-search{position:relative;flex:1}.ds-search input{width:100%;height:44px;padding:0 96px 0 12px;border:1px solid transparent;border-radius:8px;background:var(--color-card,#fff);color:var(--color-foreground,#2a211c);font:400 1rem \"Nunito Sans\",system-ui,sans-serif}.ds-search input:focus-visible{outline:none;box-shadow:0 0 0 2px var(--color-ring)}.ds-search button{position:absolute;right:4px;top:4px;height:36px;padding:0 16px;border:none;border-radius:8px;background:var(--color-primary,#a3391e);color:var(--color-on-primary,#fff);font:600 .8125rem \"Nunito Sans\",system-ui,sans-serif}.ds-search button:hover{background:var(--color-primary-hover,#842c15)}.ds-hlink{height:36px;display:inline-flex;align-items:center;padding:0 12px;border-radius:8px;color:inherit;font:600 .8125rem \"Nunito Sans\",system-ui,sans-serif;text-decoration:none}.ds-hlink:hover{background:rgb(255 255 255/.1)}.ds-hlink:focus-visible,.ds-logo:focus-visible{outline:none;box-shadow:0 0 0 2px var(--color-ring)}.ds-publicar{height:36px;display:inline-flex;align-items:center;padding:0 12px;border-radius:8px;background:var(--color-accent,#e2a33b);color:var(--color-on-accent,#2a1606);font:600 .8125rem \"Nunito Sans\",system-ui,sans-serif;text-decoration:none}.ds-publicar:hover{filter:brightness(.95)}"
+    },
+    {
+      "name": "Tarjeta de aviso",
+      "kind": "card",
+      "refersTo": "listing-card",
+      "description": "Foto entera sobre blanco, precio, título y departamento; toda la tarjeta es el link.",
+      "html": "<article class=\"ds-card\"><div class=\"ds-card-photo\"><svg width=\"48\" height=\"48\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#6b5d53\" stroke-width=\"1.5\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"9\" cy=\"9\" r=\"2\"/><path d=\"m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21\"/></svg></div><div class=\"ds-card-body\"><p class=\"ds-price\">$ 40.999</p><h3 class=\"ds-title\"><a href=\"#\">Almohada masajeadora Kanji Home 8 nodos</a></h3><div class=\"ds-meta\"><span>Capital</span><span class=\"ds-badge\">Nuevo</span></div></div></article>",
+      "css": ".ds-card{position:relative;display:flex;flex-direction:column;width:220px;overflow:hidden;border:1px solid var(--color-border,#e0d8cf);border-radius:var(--radius-card,12px);background:var(--color-card,#fff);box-shadow:0 1px 2px 0 rgb(42 33 28/.06);transition:border-color 200ms}.ds-card:hover{border-color:var(--color-primary,#a3391e)}.ds-card-photo{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;background:#fff;padding:8px}.ds-card-body{display:flex;flex-direction:column;gap:4px;padding:16px}.ds-price{margin:0;font:600 1.125rem/1.6rem Rubik,system-ui,sans-serif;color:var(--color-foreground,#2a211c)}.ds-title{margin:0;font:400 1rem/1.5rem \"Nunito Sans\",system-ui,sans-serif;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.ds-title a{color:var(--color-foreground,#2a211c);text-decoration:none}.ds-title a::after{content:\"\";position:absolute;inset:0}.ds-card:focus-within .ds-title a{text-decoration:underline}.ds-meta{display:flex;gap:8px;align-items:center;padding-top:8px;font:400 .8125rem/1.15rem \"Nunito Sans\",system-ui,sans-serif;color:var(--color-muted-foreground,#6b5d53)}.ds-badge{border:1px solid var(--color-border,#e0d8cf);background:var(--color-muted,#eae5df);color:var(--color-foreground,#2a211c);border-radius:9999px;padding:2px 10px;font-weight:600}"
+    },
+    {
+      "name": "Acceso a rubro",
+      "kind": "chip",
+      "refersTo": "category-chip-icon",
+      "description": "Círculo muted con ícono primary y nombre; hover invierte a primary.",
+      "html": "<a class=\"ds-rubro\" href=\"#\"><span class=\"ds-rubro-icon\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/></svg></span>Inmuebles</a>",
+      "css": ".ds-rubro{display:inline-flex;flex-direction:column;align-items:center;gap:8px;width:96px;padding:8px 4px;border-radius:8px;text-align:center;text-decoration:none;color:var(--color-foreground,#2a211c);font:600 .8125rem/1.15rem \"Nunito Sans\",system-ui,sans-serif;transition:color 200ms}.ds-rubro-icon{display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:9999px;background:var(--color-muted,#eae5df);color:var(--color-primary,#a3391e);transition:background-color 200ms,color 200ms}.ds-rubro:hover{color:var(--color-primary,#a3391e)}.ds-rubro:hover .ds-rubro-icon{background:var(--color-primary,#a3391e);color:var(--color-on-primary,#fff)}.ds-rubro:focus-visible{outline:2px solid var(--color-ring,#a3391e);outline-offset:2px}"
+    },
+    {
+      "name": "Carrusel principal",
+      "kind": "custom",
+      "description": "Foto del valle con velo azul noche, titular, un CTA, puntos con activo en ocre y crédito de la foto.",
+      "html": "<section class=\"ds-carousel\" aria-roledescription=\"carrusel\" aria-label=\"Novedades\"><div class=\"ds-veil\"></div><a class=\"ds-credit\" href=\"#\">Foto: M. Bustos · CC BY-SA 4.0</a><div class=\"ds-slide-text\"><h2>Comprá y vendé en San Juan</h2><p>Publicá desde el celular en minutos y recibí las consultas por WhatsApp.</p><a class=\"ds-cta\" href=\"#\">Publicar aviso</a></div><div class=\"ds-dots\"><span class=\"on\"></span><span></span><span></span></div></section>",
+      "css": ".ds-carousel{position:relative;aspect-ratio:16/5;min-height:240px;overflow:hidden;border-radius:12px;background:linear-gradient(120deg,#a3391e,#6b3a2a 45%,#16233f);color:var(--color-on-header,#f3f1ee);box-shadow:0 6px 16px -2px rgb(42 33 28/.13)}.ds-veil{position:absolute;inset:0;background:linear-gradient(to right,rgb(14 22 42/.88),rgb(14 22 42/.5),transparent)}.ds-credit{position:absolute;right:12px;top:8px;padding:0 6px;border-radius:8px;background:rgb(14 22 42/.55);color:inherit;font-size:.6875rem;line-height:20px;text-decoration:none}.ds-credit:hover{text-decoration:underline}.ds-slide-text{position:absolute;left:0;top:0;bottom:0;width:50%;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:12px;padding:0 0 40px 48px}.ds-slide-text h2{margin:0;font:700 2.25rem/1.1 Rubik,system-ui,sans-serif;text-wrap:balance}.ds-slide-text p{margin:0;max-width:24rem;font:400 1rem/1.5rem \"Nunito Sans\",system-ui,sans-serif}.ds-cta{margin-top:4px;height:48px;display:inline-flex;align-items:center;padding:0 28px;border-radius:8px;background:var(--color-accent,#e2a33b);color:var(--color-on-accent,#2a1606);font:600 1.125rem \"Nunito Sans\",system-ui,sans-serif;text-decoration:none}.ds-cta:hover{filter:brightness(.95)}.ds-cta:focus-visible{outline:2px solid var(--color-ring,#a3391e);outline-offset:2px}.ds-dots{position:absolute;left:48px;bottom:20px;display:flex;gap:13px;align-items:center}.ds-dots span{display:block;width:6px;height:6px;border-radius:9999px;background:rgb(243 241 238/.6);transition:width 300ms}.ds-dots span.on{width:24px;background:var(--color-accent,#e2a33b)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Ischigualasto de día, cielo de noche",
+    "overview": "Un marketplace grande que el visitante sabe usar sin aprender nada, vestido con el paisaje de San Juan: franja de cielo nocturno arriba, barranca roja para actuar, ocre para publicar, arcilla gris de fondo y tarjetas blancas donde la foto del producto manda. Mobile-first y calmo: la estructura es el canon de marketplace; la identidad la pone el paisaje.",
+    "keyCharacteristics": [
+      "Franja de header azul noche full-bleed con buscador blanco",
+      "Rojo arenisca para toda acción; ocre solo para publicar y confirmar",
+      "Fondo gris arcilla, tarjetas blancas 12px, una sola escala de sombras",
+      "Fotos de producto enteras sobre blanco; fotos del valle con velo azul noche y crédito visible",
+      "Rubik para títulos, Nunito Sans para texto, servidas desde el sitio",
+      "Dark mode obligatorio por preferencia y por toggle"
+    ],
+    "rules": [
+      {
+        "name": "La regla del verde WhatsApp",
+        "body": "El verde #25D366 es exclusivo del contacto por WhatsApp. Nada más en el sitio es verde.",
+        "section": "colors"
+      },
+      {
+        "name": "La regla del ocre que publica",
+        "body": "El ocre como acción es solo \"Publicar aviso\" (y sus variantes) y confirmaciones; cualquier otra acción va en rojo arenisca. Fuera de botones, el ocre aparece solo como marca sobre azul noche (el \"Aqui\" del logo, el indicador activo del carrusel). Ocre como texto sobre fondo claro (2,2:1) está prohibido.",
+        "section": "colors"
+      },
+      {
+        "name": "La regla de una sola franja",
+        "body": "El azul noche es la franja del header y los paneles con foto (carrusel, tarjeta de tienda). No es color de botón ni de texto sobre fondos claros.",
+        "section": "colors"
+      },
+      {
+        "name": "La regla del foco claro en la franja",
+        "body": "Dentro del header --color-ring pasa a on-header para que el foco se vea sobre el azul; los desplegables claros vuelven a --color-ring: var(--color-primary).",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do usar rgb() explícito en arbitrary values para velos y scrims (from-[rgb(14_22_42/0.9)]).",
+      "Do redefinir --color-ring a primary en toda superficie clara que se abra desde el header.",
+      "Do mostrar el crédito \"Foto: autor · licencia\" con link a la fuente en cada foto CC BY-SA, y guardar su procedencia junto al archivo.",
+      "Do mostrar las fotos de producto enteras (object-contain sobre blanco).",
+      "Do redefinir cada token nuevo en light, prefers-color-scheme dark y [data-theme=\"dark\"]."
+    ],
+    "donts": [
+      "Don't usar el verde WhatsApp para nada que no sea el contacto por WhatsApp.",
+      "Don't usar ocre para acciones que no sean publicar o confirmar, ni como texto sobre fondo claro.",
+      "Don't usar modificadores de opacidad de Tailwind (/90) sobre colores del sistema: no generan color.",
+      "Don't usar el azul noche como color de botón o de texto sobre fondos claros.",
+      "Don't copiar marca, nombre ni el amarillo de Mercado Libre.",
+      "Don't poner tarjetas dentro de tarjetas ni CTAs genéricos."
+    ]
+  }
+}

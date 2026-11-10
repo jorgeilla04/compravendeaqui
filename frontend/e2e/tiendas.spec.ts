@@ -117,7 +117,11 @@ test("la dirección vieja /uniformes lleva a la tienda", async ({ page }) => {
   await page.goto("/uniformes");
   await expect(page).toHaveURL(/\/tiendas\/uniformes$/);
   await page.goto("/tiendas");
-  await page.getByRole("link", { name: /Uniformes escolares/ }).click();
+  // El header también enlaza la tienda: se elige la tarjeta del listado.
+  await page
+    .getByRole("main")
+    .getByRole("link", { name: /Uniformes escolares/ })
+    .click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Uniformes escolares" }),
   ).toBeVisible();

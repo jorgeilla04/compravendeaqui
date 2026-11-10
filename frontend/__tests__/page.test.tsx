@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import HomePage from "@/app/page";
 import type { CategoryNode, ListingPage } from "@/lib/types";
@@ -57,7 +58,16 @@ describe("HomePage", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: /San Juan/i }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("search")).toBeInTheDocument();
+    // Carrusel con la primera diapositiva visible y la llamada a publicar.
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Comprá y vendé en San Juan",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Pausar el carrusel" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Vehículos/ })).toHaveAttribute(
       "href",
       "/vehiculos",
@@ -77,5 +87,38 @@ describe("HomePage", () => {
     expect(
       screen.getByRole("link", { name: "Publicar el primero" }),
     ).toHaveAttribute("href", "/publicar");
+  });
+});
+
+describe("HomeCarousel", () => {
+  it("cambia de diapositiva con las flechas y los puntos, y se pausa", async () => {
+    const user = userEvent.setup();
+    mockApi({
+      "/categories": [],
+      "/listings": { items: [], next_cursor: null },
+    });
+    render(await HomePage());
+    const activa = () =>
+      screen
+        .getAllByRole("group", { hidden: true })
+        .find((g) => g.getAttribute("aria-hidden") === "false");
+
+    expect(activa()).toHaveAccessibleName(/^1 de 3/);
+    await user.click(
+      screen.getByRole("button", { name: "Diapositiva siguiente" }),
+    );
+    expect(activa()).toHaveAccessibleName(/^2 de 3/);
+    // Las diapositivas ocultas no se alcanzan con Tab.
+    expect(screen.getAllByRole("group", { hidden: true })[0]).toHaveAttribute(
+      "inert",
+    );
+    await user.click(screen.getByRole("button", { name: /Ver diapositiva 3/ }));
+    expect(activa()).toHaveAccessibleName(/^3 de 3/);
+    await user.click(
+      screen.getByRole("button", { name: "Pausar el carrusel" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Reanudar el carrusel" }),
+    ).toBeInTheDocument();
   });
 });
