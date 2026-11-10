@@ -651,6 +651,8 @@ def test_crear_tienda_y_asignar_encargado(
     assert lib["departamentos_envio"] == ["Capital", "Rivadavia"]
 
     encargado, email = _admin_of(make_user, db, role="user")
+    assert encargado.get("/api/v1/auth/me").json()["gestiona_tiendas"] is False
+    assert admin.get("/api/v1/auth/me").json()["gestiona_tiendas"] is True
     assert encargado.get(f"{ADMIN}/libreria-el-estudiante/catalogo").status_code == 404
     sin_cuenta = admin.post(
         f"{ADMIN}/libreria-el-estudiante/encargados", json={"email": "nadie@mail.com"}
@@ -665,7 +667,8 @@ def test_crear_tienda_y_asignar_encargado(
         for e in admin.get(f"{ADMIN}/libreria-el-estudiante/encargados").json()
     ] == [email]
 
-    # El encargado ve y maneja solo su tienda.
+    # El encargado ve y maneja solo su tienda (y el menú le muestra el panel).
+    assert encargado.get("/api/v1/auth/me").json()["gestiona_tiendas"] is True
     assert [t["slug"] for t in encargado.get(ADMIN).json()] == [
         "libreria-el-estudiante"
     ]
@@ -691,6 +694,7 @@ def test_crear_tienda_y_asignar_encargado(
     quitado = admin.delete(f"{ADMIN}/libreria-el-estudiante/encargados/{user_id}")
     assert quitado.status_code == 204
     assert encargado.get(ADMIN).json() == []
+    assert encargado.get("/api/v1/auth/me").json()["gestiona_tiendas"] is False
     otra_vez = admin.delete(f"{ADMIN}/libreria-el-estudiante/encargados/{user_id}")
     assert otra_vez.status_code == 404
 

@@ -9,18 +9,33 @@ from typing import Any
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.core import ratelimit
 from app.core.logging import get_logger
 from app.core.phone import mask_phone
 from app.models import Listing, User
+from app.models.tiendas import TiendaAdmin
 from app.schemas.user import MeOut, UserUpdateIn
 from app.services import images as image_service
 from app.services import storage
 from app.services.auth import revoke_all
 
 log = get_logger(__name__)
+
+
+def _gestiona_tiendas(user: User) -> bool:
+    if user.role == "admin":
+        return True
+    db = object_session(user)
+    if db is None:
+        return False
+    return (
+        db.scalars(
+            select(TiendaAdmin.tienda_id).where(TiendaAdmin.user_id == user.id).limit(1)
+        ).first()
+        is not None
+    )
 
 
 def to_me(user: User) -> MeOut:
@@ -39,6 +54,7 @@ def to_me(user: User) -> MeOut:
         whatsapp_optin=user.whatsapp_optin,
         profile_pending=user.profile_pending,
         has_password=bool(user.password_hash),
+        gestiona_tiendas=_gestiona_tiendas(user),
     )
 
 

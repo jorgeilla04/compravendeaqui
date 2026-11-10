@@ -50,9 +50,23 @@ describe("navegación", () => {
       "href",
       "/mis-avisos",
     );
+    // Sin tiendas a cargo no ve el panel.
+    expect(
+      screen.queryByRole("link", { name: "Mis tiendas" }),
+    ).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Salir" }));
     expect(logout).toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith("/");
+  });
+
+  it("menú de cuenta: el admin o encargado ve Mis tiendas", async () => {
+    auth = { user: { ...me, gestiona_tiendas: true }, loading: false };
+    render(<AccountMenu />);
+    await userEvent.click(screen.getByText("Ana Gómez"));
+    expect(screen.getByRole("link", { name: "Mis tiendas" })).toHaveAttribute(
+      "href",
+      "/tiendas/admin",
+    );
   });
 
   it("bottom nav marca la página actual y cambia según la sesión", () => {
