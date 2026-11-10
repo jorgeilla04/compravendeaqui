@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 
 import { GuiaTallesEditor } from "@/components/tiendas/admin/guia-talles-editor";
 import { GuiaTalles } from "@/components/tiendas/guia-talles";
+import { cotaDe } from "@/components/tiendas/prenda-cotas";
 import type { Medidas, ProductoAdmin } from "@/lib/tiendas/types";
 import { mockApi } from "@/test-utils/api-mock";
 
@@ -31,7 +32,14 @@ const remera: ProductoAdmin = {
 describe("GuiaTalles", () => {
   it("muestra las medidas en cm y resalta el talle elegido", async () => {
     const user = userEvent.setup();
-    render(<GuiaTalles prenda="Remera" medidas={medidas} seleccionado="6" />);
+    render(
+      <GuiaTalles
+        prenda="Remera"
+        tipo="remera"
+        medidas={medidas}
+        seleccionado="6"
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "Guía de talles" }));
     const dialog = screen.getByRole("dialog", {
@@ -45,6 +53,36 @@ describe("GuiaTalles", () => {
     expect(
       within(dialog).getByRole("columnheader", { name: "Largo total" }),
     ).toBeInTheDocument();
+
+    // La figura marca cada medida y muestra los cm del talle que se mira.
+    expect(dialog.querySelectorAll("svg line")).toHaveLength(2);
+    const leyenda = within(dialog).getByRole("list", {
+      name: "Medidas del talle 6",
+    });
+    expect(within(leyenda).getByText("47 cm")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "4" }));
+    expect(within(dialog).getByRole("button", { name: "4" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    const leyenda4 = within(dialog).getByRole("list", {
+      name: "Medidas del talle 4",
+    });
+    expect(within(leyenda4).getByText("44 cm")).toBeInTheDocument();
+    expect(within(leyenda4).getByText("33 cm")).toBeInTheDocument();
+    expect(within(dialog).getByRole("row", { name: /^4/ })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
+
+  it("reconoce las columnas por su nombre", () => {
+    expect(cotaDe("Largo de manga")).toBe("manga");
+    expect(cotaDe("Ancho de pecho (axila a axila)")).toBe("pecho");
+    expect(cotaDe("Contorno de cintura")).toBe("cintura");
+    expect(cotaDe("Entrepierna")).toBe("entrepierna");
+    expect(cotaDe("Largo total")).toBe("largo");
+    expect(cotaDe("Hombro")).toBeNull();
   });
 });
 

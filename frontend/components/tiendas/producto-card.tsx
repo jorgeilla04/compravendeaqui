@@ -117,6 +117,7 @@ export function ProductoCard({
         {producto.medidas && producto.medidas.filas.length > 0 ? (
           <GuiaTalles
             prenda={producto.nombre}
+            tipo={producto.tipo}
             medidas={producto.medidas}
             seleccionado={opcion}
           />
