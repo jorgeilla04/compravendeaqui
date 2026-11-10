@@ -726,6 +726,12 @@ async def subir_imagen(upload: UploadFile, carpeta: str) -> str:
     return guardar_imagen(raw, carpeta)
 
 
+def borrar_imagenes(urls: list[str | None]) -> None:
+    """Borra del bucket las imágenes de tiendas que ya no se usan."""
+    keys = [k for u in urls if (k := storage.key_from_url(u, "tiendas/"))]
+    storage.delete_objects(keys)
+
+
 def guardar_imagen(raw: bytes, carpeta: str) -> str:
     """Convierte a webp y la sube al bucket; devuelve la URL pública."""
     try:

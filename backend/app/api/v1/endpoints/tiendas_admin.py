@@ -291,10 +291,12 @@ async def subir_logo(
     """Escudo o logo oficial (con autorización de la institución)."""
     tienda = _tienda(db, user, slug)
     grupo = service.get_grupo(db, tienda, grupo_slug, include_inactive=True)
+    anterior = grupo.logo_url
     grupo.logo_url = await service.subir_imagen(
         file, f"{tienda.slug}/logos/{grupo.slug}"
     )
     db.commit()
+    service.borrar_imagenes([anterior])
     db.refresh(grupo)
     return GrupoAdminOut.model_validate(grupo)
 
@@ -310,13 +312,23 @@ async def agregar_foto_grupo(
     """Foto del uniforme completo (galería del grupo)."""
     tienda = _tienda(db, user, slug)
     grupo = service.get_grupo(db, tienda, grupo_slug, include_inactive=True)
+    etiqueta = tienda.grupo_label.lower()
     if len(grupo.fotos or []) >= service.MAX_FOTOS_GRUPO:
-        etiqueta = tienda.grupo_label.lower()
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             detail=f"Hasta {service.MAX_FOTOS_GRUPO} fotos por {etiqueta}",
         )
     url = await service.subir_imagen(file, f"{tienda.slug}/grupos/{grupo.slug}")
+    # Dos subidas a la vez: se relee con lock para no pasar el tope ni pisar
+    # la foto que agregó la otra.
+    db.refresh(grupo, with_for_update=True)
+    if len(grupo.fotos or []) >= service.MAX_FOTOS_GRUPO:
+        db.rollback()
+        service.borrar_imagenes([url])
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail=f"Hasta {service.MAX_FOTOS_GRUPO} fotos por {etiqueta}",
+        )
     grupo.fotos = [*(grupo.fotos or []), url]
     db.commit()
     db.refresh(grupo)
@@ -334,9 +346,10 @@ def quitar_foto_grupo(
     fotos = list(grupo.fotos or [])
     if not 0 <= indice < len(fotos):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No existe esa foto")
-    del fotos[indice]
+    quitada = fotos.pop(indice)
     grupo.fotos = fotos
     db.commit()
+    service.borrar_imagenes([quitada])
     db.refresh(grupo)
     return GrupoAdminOut.model_validate(grupo)
 
@@ -394,10 +407,12 @@ async def subir_foto(
 ) -> ProductoAdminOut:
     tienda = _tienda(db, user, slug)
     producto = service.get_producto(db, tienda, producto_slug)
+    anterior = producto.foto_url
     producto.foto_url = await service.subir_imagen(
         file, f"{tienda.slug}/productos/{producto.slug}"
     )
     db.commit()
+    service.borrar_imagenes([anterior])
     db.refresh(producto)
     return ProductoAdminOut.model_validate(producto)
 
@@ -447,8 +462,9 @@ async def subir_foto_en_grupo(
         file, f"{tienda.slug}/grupos/{grupo.slug}/{producto.slug}"
     )
     fila = service.fila_precio(db, tienda, grupo, producto)
-    fila.foto_url = url
+    anterior, fila.foto_url = fila.foto_url, url
     db.commit()
+    service.borrar_imagenes([anterior])
     return _precio_out(grupo, producto, fila)
 
 
@@ -467,6 +483,7 @@ def quitar_foto_en_grupo(
     grupo = service.get_grupo(db, tienda, grupo_slug, include_inactive=True)
     producto = service.get_producto(db, tienda, producto_slug)
     fila = service.fila_precio(db, tienda, grupo, producto)
-    fila.foto_url = None
+    anterior, fila.foto_url = fila.foto_url, None
     db.commit()
+    service.borrar_imagenes([anterior])
     return _precio_out(grupo, producto, fila)

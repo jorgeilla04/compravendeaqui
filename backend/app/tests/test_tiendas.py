@@ -983,8 +983,16 @@ def test_foto_de_producto_por_grupo(
     assert {p["producto"]: p["foto_url"] for p in catalogo["precios"]} == {
         "remera": propia_url
     }
+    # Reemplazar o quitar la foto borra la anterior del bucket.
+    objetos = len(fake_storage)
+    reemplazo = admin.post(url_slug, files=_jpg()).json()["foto_url"]
+    assert reemplazo != propia_url and len(fake_storage) == objetos
     assert admin.delete(url_slug).json()["foto_url"] is None
+    assert len(fake_storage) == objetos - 1
     assert foto(otro["slug"]) == general_url
+    otra_general = admin.post(f"{ADMIN}/uniformes/productos/remera/foto", files=_jpg())
+    assert otra_general.json()["foto_url"] != general_url
+    assert len(fake_storage) == objetos - 1  # la general vieja también se borra
     nada = f"{ADMIN}/uniformes/grupos/{otro['slug']}/productos/nada/foto"
     assert admin.post(nada, files=_jpg()).status_code == 404
 
@@ -1002,12 +1010,67 @@ def test_galeria_del_grupo(
     assert len(fotos) == 2 and fotos[0] == primera[0]
     publico = client.get(f"{API}/uniformes/grupos/{colegio['slug']}").json()
     assert publico["fotos"] == fotos
+    assert len(fake_storage) == 2
     assert admin.delete(f"{base}/0").json()["fotos"] == fotos[1:]
+    assert len(fake_storage) == 1
     assert admin.delete(f"{base}/5").status_code == 404
     monkeypatch.setattr("app.services.tiendas.MAX_FOTOS_GRUPO", 1)
     lleno = admin.post(base, files=_jpg())
     assert lleno.status_code == 409
     assert "Hasta 1 fotos" in lleno.json()["detail"]
+
+
+def test_galeria_tope_con_subidas_simultaneas(
+    admin: TestClient,
+    colegio: dict[str, Any],
+    fake_storage: dict[str, bytes],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Otra subida completa la galería mientras esta sube: no pasa el tope
+    y la imagen que sobra se borra."""
+    from app.database import SessionLocal
+    from app.services import tiendas as service
+
+    monkeypatch.setattr(service, "MAX_FOTOS_GRUPO", 1)
+    original = service.subir_imagen
+
+    async def subir_y_competir(upload: Any, carpeta: str) -> str:
+        url = await original(upload, carpeta)
+        with SessionLocal() as otra:
+            grupo = otra.scalars(
+                select(Grupo).where(Grupo.slug == colegio["slug"])
+            ).one()
+            grupo.fotos = ["https://cdn.test/media/tiendas/otra.webp"]
+            otra.commit()
+        return url
+
+    monkeypatch.setattr(service, "subir_imagen", subir_y_competir)
+    respuesta = admin.post(
+        f"{ADMIN}/uniformes/grupos/{colegio['slug']}/fotos", files=_jpg()
+    )
+    assert respuesta.status_code == 409
+    assert fake_storage == {}
+
+
+def test_borrar_solo_imagenes_propias(
+    fake_storage: dict[str, bytes], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import storage
+    from app.services.tiendas import borrar_imagenes
+
+    borradas: list[list[str]] = []
+    monkeypatch.setattr(storage, "delete_objects", borradas.append)
+    propia = storage.public_url("tiendas/uniformes/a.webp")
+    borrar_imagenes(
+        [
+            propia,
+            None,
+            "https://otro.sitio/tiendas/x.webp",
+            storage.public_url("avatars/u.webp"),
+            storage.public_url("tiendas/../avatars/u.webp"),
+        ]
+    )
+    assert borradas == [["tiendas/uniformes/a.webp"]]
 
 
 def test_galeria_sin_permiso(
