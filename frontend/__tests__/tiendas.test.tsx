@@ -975,6 +975,49 @@ describe("administración de tiendas", () => {
     );
   });
 
+  it("busca colegios en el panel", async () => {
+    const user = userEvent.setup();
+    mockApi({
+      "GET /auth/me": () => ({ status: 200, json: me("user") }),
+      "GET /admin/tiendas/uniformes/catalogo": () => ({
+        status: 200,
+        json: {
+          ...catalogo,
+          grupos: [
+            ...catalogo.grupos,
+            {
+              ...santaRosa,
+              slug: "san-pablo",
+              nombre: "Colegio San Pablo",
+              subtitulo: "Rivadavia",
+              activo: true,
+              fotos: [],
+            },
+          ],
+        },
+      }),
+      "GET /admin/tiendas/uniformes/pedidos": () => ({ status: 200, json: [] }),
+    });
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "Colegios" }));
+    expect(screen.getByText("Colegio Santa Rosa de Lima")).toBeVisible();
+    const buscar = screen.getByLabelText("Buscar colegio");
+    await user.type(buscar, "rivadavia");
+    expect(screen.getByRole("status")).toHaveTextContent("1 de 2");
+    expect(
+      screen.queryByText("Colegio Santa Rosa de Lima"),
+    ).not.toBeInTheDocument();
+    // Con un solo resultado ya queda abierto para editarlo.
+    expect(
+      screen.getByText("Colegio San Pablo").closest("details"),
+    ).toHaveAttribute("open");
+    await user.clear(buscar);
+    await user.type(buscar, "zzz");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      'Ningún colegio coincide con "zzz".',
+    );
+  });
+
   it("edita nombre y descripción de un producto", async () => {
     const user = userEvent.setup();
     const calls = mockApi({

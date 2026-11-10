@@ -16,11 +16,9 @@ export function normalize(text: string): string {
     .toLowerCase();
 }
 
-export function filterGrupos(
-  grupos: Grupo[],
-  query: string,
-  categoria: string | null,
-): Grupo[] {
+export function filterGrupos<
+  T extends Pick<Grupo, "nombre" | "subtitulo" | "categoria">,
+>(grupos: T[], query: string, categoria: string | null): T[] {
   const terms = normalize(query).split(/\s+/).filter(Boolean);
   return grupos.filter((g) => {
     if (categoria && g.categoria !== categoria) return false;
