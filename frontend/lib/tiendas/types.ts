@@ -63,6 +63,8 @@ export interface Producto {
 }
 
 export interface GrupoDetalle extends Grupo {
+  /** Fotos del uniforme completo (galería). */
+  fotos: string[];
   productos: Producto[];
 }
 
@@ -147,6 +149,7 @@ export interface TiendaAdmin extends TiendaConfig {
 
 export interface GrupoAdmin extends Grupo {
   activo: boolean;
+  fotos: string[];
 }
 
 export interface ProductoAdmin {
@@ -166,6 +169,8 @@ export interface PrecioGrupo {
   producto: string;
   precio: string | null;
   disponible: boolean;
+  /** Foto del producto en este grupo (null = la foto general). */
+  foto_url?: string | null;
 }
 
 export interface CatalogoAdmin {

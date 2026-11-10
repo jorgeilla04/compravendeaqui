@@ -163,6 +163,7 @@ def validar_config(tienda: Tienda) -> None:
 class ProductoPrecio:
     producto: Producto
     precio: Decimal
+    foto_url: str | None
 
 
 def list_grupos(
@@ -231,8 +232,38 @@ def productos_de(db: Session, tienda: Tienda, grupo: Grupo) -> list[ProductoPrec
             if override is not None and override.precio is not None
             else producto.precio_base
         )
-        result.append(ProductoPrecio(producto, precio))
+        foto = (
+            override.foto_url
+            if override is not None and override.foto_url
+            else producto.foto_url
+        )
+        result.append(ProductoPrecio(producto, precio, foto))
     return result
+
+
+MAX_FOTOS_GRUPO = 8
+
+
+def fila_precio(
+    db: Session, tienda: Tienda, grupo: Grupo, producto: Producto
+) -> PrecioGrupo:
+    """Fila de precio/foto del producto en el grupo (la crea si no existe).
+
+    Una fila nueva conserva lo que ya se veía: precio base y disponible según
+    la tienda."""
+    fila = db.scalars(
+        select(PrecioGrupo).where(
+            PrecioGrupo.grupo_id == grupo.id, PrecioGrupo.producto_id == producto.id
+        )
+    ).first()
+    if fila is None:
+        fila = PrecioGrupo(
+            grupo_id=grupo.id,
+            producto_id=producto.id,
+            disponible=tienda.productos_en_todos,
+        )
+        db.add(fila)
+    return fila
 
 
 # --- Cotización ---------------------------------------------------------------
@@ -692,6 +723,11 @@ async def subir_imagen(upload: UploadFile, carpeta: str) -> str:
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"La imagen puede pesar hasta {settings.image_max_upload_mb} MB",
         )
+    return guardar_imagen(raw, carpeta)
+
+
+def guardar_imagen(raw: bytes, carpeta: str) -> str:
+    """Convierte a webp y la sube al bucket; devuelve la URL pública."""
     try:
         processed = image_service.process_image(raw)
     except image_service.InvalidImageError as exc:

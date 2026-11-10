@@ -20,6 +20,7 @@ from sqlalchemy import select, update
 
 from app.config import Settings, settings
 from app.models import Grupo, Pedido, Tienda, User
+from app.scripts.fotos_grupo import main as fotos_grupo
 from app.scripts.import_grupos import import_grupos
 from app.scripts.make_admin import set_role
 from app.services import mailer
@@ -938,6 +939,86 @@ def test_admin_logo_y_foto(
     assert admin.put(f"{ADMIN}/uniformes/productos/nada", json={}).status_code == 404
 
 
+def _jpg(name: str = "f.jpg") -> dict[str, Any]:
+    return {"file": (name, io.BytesIO(jpeg_bytes((600, 600))), "image/jpeg")}
+
+
+def test_foto_de_producto_por_grupo(
+    admin: TestClient,
+    client: TestClient,
+    colegio: dict[str, Any],
+    fake_storage: dict[str, bytes],
+) -> None:
+    otro = admin.post(
+        f"{ADMIN}/uniformes/grupos",
+        json={"nombre": "Colegio San Pablo", "color1": "#111111", "color2": "#eeeeee"},
+    ).json()
+    general = admin.post(f"{ADMIN}/uniformes/productos/remera/foto", files=_jpg())
+    general_url = general.json()["foto_url"]
+    url_slug = f"{ADMIN}/uniformes/grupos/{otro['slug']}/productos/remera/foto"
+    propia = admin.post(url_slug, files=_jpg())
+    assert propia.status_code == 200, propia.text
+    propia_url = propia.json()["foto_url"]
+    assert propia_url.startswith(
+        "https://cdn.test/media/tiendas/uniformes/grupos/colegio-san-pablo/remera/"
+    )
+
+    def foto(grupo: str) -> str | None:
+        productos = client.get(f"{API}/uniformes/grupos/{grupo}").json()["productos"]
+        url: str | None = next(p for p in productos if p["slug"] == "remera")[
+            "foto_url"
+        ]
+        return url
+
+    assert foto(otro["slug"]) == propia_url
+    assert foto(colegio["slug"]) == general_url  # el otro colegio no cambia
+    # Cambiar el precio no borra la foto, y la fila nueva no oculta la prenda.
+    precio = admin.put(
+        f"{ADMIN}/uniformes/precios",
+        json={"grupo": otro["slug"], "producto": "remera", "precio": "12000"},
+    ).json()
+    assert precio["foto_url"] == propia_url
+    assert foto(otro["slug"]) == propia_url
+    catalogo = admin.get(f"{ADMIN}/uniformes/catalogo").json()
+    assert {p["producto"]: p["foto_url"] for p in catalogo["precios"]} == {
+        "remera": propia_url
+    }
+    assert admin.delete(url_slug).json()["foto_url"] is None
+    assert foto(otro["slug"]) == general_url
+    nada = f"{ADMIN}/uniformes/grupos/{otro['slug']}/productos/nada/foto"
+    assert admin.post(nada, files=_jpg()).status_code == 404
+
+
+def test_galeria_del_grupo(
+    admin: TestClient,
+    client: TestClient,
+    colegio: dict[str, Any],
+    fake_storage: dict[str, bytes],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base = f"{ADMIN}/uniformes/grupos/{colegio['slug']}/fotos"
+    primera = admin.post(base, files=_jpg()).json()["fotos"]
+    fotos = admin.post(base, files=_jpg()).json()["fotos"]
+    assert len(fotos) == 2 and fotos[0] == primera[0]
+    publico = client.get(f"{API}/uniformes/grupos/{colegio['slug']}").json()
+    assert publico["fotos"] == fotos
+    assert admin.delete(f"{base}/0").json()["fotos"] == fotos[1:]
+    assert admin.delete(f"{base}/5").status_code == 404
+    monkeypatch.setattr("app.services.tiendas.MAX_FOTOS_GRUPO", 1)
+    lleno = admin.post(base, files=_jpg())
+    assert lleno.status_code == 409
+    assert "Hasta 1 fotos" in lleno.json()["detail"]
+
+
+def test_galeria_sin_permiso(
+    make_user: MakeUser, colegio: dict[str, Any], fake_storage: dict[str, bytes]
+) -> None:
+    ajeno, _ = make_user()
+    base = f"{ADMIN}/uniformes/grupos/{colegio['slug']}"
+    assert ajeno.post(f"{base}/fotos", files=_jpg()).status_code == 404
+    assert ajeno.delete(f"{base}/productos/remera/foto").status_code == 404
+
+
 def test_admin_producto_inactivo_y_opciones(
     admin: TestClient, client: TestClient, colegio: dict[str, Any]
 ) -> None:
@@ -993,6 +1074,33 @@ def test_import_grupos(db: Any) -> None:
         import_grupos("uniformes", [{**rows[0], "categoria": "Públicos"}])
     with pytest.raises(ValueError, match="No existe"):
         import_grupos("nada", rows)
+
+
+def test_script_fotos_grupo(
+    db: Any, fake_storage: dict[str, bytes], tmp_path: Any
+) -> None:
+    import_grupos(
+        "uniformes",
+        [{"nombre": "Colegio San Pablo", "color1": "#111111", "color2": "#eeeeee"}],
+    )
+    imagen = tmp_path / "a.jpg"
+    imagen.write_bytes(jpeg_bytes((500, 500)))
+    salida = fotos_grupo(
+        [
+            "uniformes",
+            "colegio-san-pablo",
+            "--galeria",
+            str(imagen),
+            str(imagen),
+            "--producto",
+            "pollera",
+            str(imagen),
+        ]
+    )
+    assert salida == "Colegio San Pablo: 2 fotos en la galería, 1 prendas con foto"
+    assert len(fake_storage) == 3
+    with pytest.raises(SystemExit, match="No existe"):
+        fotos_grupo(["nada", "colegio-san-pablo"])
 
 
 def test_make_admin(make_user: MakeUser, db: Any) -> None:

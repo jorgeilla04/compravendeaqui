@@ -158,6 +158,7 @@ def grupo(slug: str, grupo_slug: str, db: DbSession) -> GrupoDetalleOut:
     found = service.get_grupo(db, found_tienda, grupo_slug)
     return GrupoDetalleOut(
         **GrupoOut.model_validate(found).model_dump(),
+        fotos=found.fotos or [],
         productos=[
             ProductoOut(
                 slug=pp.producto.slug,
@@ -166,7 +167,7 @@ def grupo(slug: str, grupo_slug: str, db: DbSession) -> GrupoDetalleOut:
                 tipo=pp.producto.tipo,
                 precio=pp.precio,
                 opciones=pp.producto.opciones,
-                foto_url=pp.producto.foto_url,
+                foto_url=pp.foto_url,
             )
             for pp in service.productos_de(db, found_tienda, found)
         ],

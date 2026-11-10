@@ -131,6 +131,7 @@ class ProductoOut(BaseModel):
 
 
 class GrupoDetalleOut(GrupoOut):
+    fotos: list[str]
     productos: list[ProductoOut]
 
 
@@ -341,6 +342,7 @@ class GrupoUpdateIn(BaseModel):
 
 class GrupoAdminOut(GrupoOut):
     activo: bool
+    fotos: list[str]
 
 
 class ProductoIn(BaseModel):
@@ -400,6 +402,7 @@ class PrecioOut(BaseModel):
     producto: str
     precio: Monto | None
     disponible: bool
+    foto_url: str | None = None
 
 
 class CatalogoAdminOut(BaseModel):

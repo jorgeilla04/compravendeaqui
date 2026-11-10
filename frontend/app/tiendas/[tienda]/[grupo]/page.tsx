@@ -68,6 +68,26 @@ export default async function GrupoPage({ params }: Props) {
           </p>
         </div>
       </header>
+      {grupo.fotos?.length ? (
+        <section aria-label={`Fotos del uniforme de ${grupo.nombre}`}>
+          <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+            {grupo.fotos.map((url, i) => (
+              <li
+                key={url}
+                className="w-72 shrink-0 snap-start overflow-hidden rounded-card border border-border bg-muted sm:w-80"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- foto del bucket */}
+                <img
+                  src={url}
+                  alt={`Uniforme de ${grupo.nombre}, foto ${i + 1} de ${grupo.fotos.length}`}
+                  loading={i === 0 ? "eager" : "lazy"}
+                  className="aspect-square size-full object-contain"
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {grupo.productos.length === 0 ? (
         <p className="text-muted-foreground">
           Todavía no hay productos cargados acá.
