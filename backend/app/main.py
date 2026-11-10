@@ -26,15 +26,26 @@ def _log_integrations() -> None:
     if channels:
         log.info("integrations.otp", channels=channels)
     else:
+        faltan = (
+            "SMTP_HOST y EMAIL_FROM"
+            if settings.login_method == "email"
+            else "WHATSAPP_* y/o TWILIO_*"
+        )
         log.warning(
             "integrations.otp_not_configured",
-            hint="Configurá WHATSAPP_* y/o TWILIO_* en .env: el ingreso por OTP "
+            hint=f"Configurá {faltan} en .env: el ingreso por código "
             "responde 503 hasta entonces.",
         )
     if not settings.s3_configured:
         log.warning(
             "integrations.storage_not_configured",
             hint="Configurá S3_* en .env para poder subir fotos.",
+        )
+    if not settings.mp_configured:
+        log.warning(
+            "integrations.mercadopago_not_configured",
+            hint="Configurá MP_ACCESS_TOKEN y MP_WEBHOOK_SECRET en .env: hasta "
+            "entonces las tiendas toman pedidos pero no cobran online.",
         )
 
 

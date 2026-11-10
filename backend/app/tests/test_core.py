@@ -175,3 +175,18 @@ def test_trusted_proxy_accepts_cidr(monkeypatch: pytest.MonkeyPatch) -> None:
     assert not is_trusted_proxy("8.8.8.8")
     assert not is_trusted_proxy("no-es-ip")
     assert not is_trusted_proxy(None)
+
+
+def test_aviso_de_integraciones_segun_el_ingreso(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from app import main
+
+    monkeypatch.setattr(main, "configured_senders", lambda: [])
+    monkeypatch.setattr(main.settings, "login_method", "email")
+    main._log_integrations()
+    salida = capsys.readouterr().out
+    assert "SMTP_HOST y EMAIL_FROM" in salida and "TWILIO" not in salida
+    monkeypatch.setattr(main.settings, "login_method", "phone")
+    main._log_integrations()
+    assert "WHATSAPP_* y/o TWILIO_*" in capsys.readouterr().out
