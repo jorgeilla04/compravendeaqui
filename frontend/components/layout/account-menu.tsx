@@ -16,18 +16,23 @@ export function AccountMenu() {
   if (loading) return <span className="h-9 w-20" aria-hidden="true" />;
   if (!user) {
     return (
-      <Button asChild variant="ghost" size="sm">
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="text-header-foreground hover:bg-white/10 hover:text-header-foreground"
+      >
         <Link href="/ingresar">Ingresar</Link>
       </Button>
     );
   }
   return (
     <details className="relative">
-      <summary className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-input px-3 text-meta font-semibold text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+      <summary className="flex h-9 cursor-pointer list-none items-center gap-2 rounded-input px-3 text-meta font-semibold text-header-foreground hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
         <User aria-hidden="true" className="size-5" />
         <span className="max-w-32 truncate">{user.display_name}</span>
       </summary>
-      <div className="absolute right-0 z-40 mt-1 flex w-52 flex-col rounded-input border border-border bg-card py-1 shadow-md">
+      <div className="absolute right-0 z-40 mt-1 flex w-52 flex-col rounded-input border border-border bg-card py-1 text-card-foreground shadow-md [--color-ring:var(--color-primary)]">
         <Link
           href="/mis-avisos"
           className="px-3 py-2.5 text-base hover:bg-muted"

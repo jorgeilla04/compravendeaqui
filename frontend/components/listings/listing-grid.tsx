@@ -1,10 +1,22 @@
 import { ListingCard } from "@/components/listings/listing-card";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ListingCard as ListingCardData } from "@/lib/types";
 
-export function ListingGrid({ items }: { items: ListingCardData[] }) {
+export function ListingGrid({
+  items,
+  className,
+}: {
+  items: ListingCardData[];
+  className?: string;
+}) {
   return (
-    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <ul
+      className={cn(
+        "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+        className,
+      )}
+    >
       {items.map((item, index) => (
         <li key={item.id} className="flex">
           <div className="flex-1">

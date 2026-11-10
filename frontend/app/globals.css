@@ -8,60 +8,68 @@
  * Contraste AA en ambos modos.
  */
 :root {
-  /* Color — light */
-  --color-primary: #2563eb;
+  /* Color — light: Ischigualasto de día (barranca roja, ocre, arcilla gris) */
+  --color-primary: #a3391e; /* rojo arenisca: acciones, links, precios */
   --color-on-primary: #ffffff;
-  /* Hover del primario: más oscuro para mantener AA con texto blanco (6,7:1). */
-  --color-primary-hover: #1d4ed8;
-  --color-secondary: #3b82f6;
+  --color-primary-hover: #842c15;
+  --color-secondary: #1f4f8a; /* azul cielo de altura */
   --color-on-secondary: #ffffff;
-  --color-accent: #15803d; /* #16A34A ajustado: blanco encima da 3.3:1, no pasa AA */
-  --color-on-accent: #ffffff;
+  --color-accent: #e2a33b; /* ocre: Publicar aviso y confirmaciones */
+  --color-on-accent: #2a1606;
   --color-whatsapp: #25d366;
   --color-on-whatsapp: #052e16;
-  --color-background: #eff6ff;
-  --color-foreground: #1e40af;
-  --color-muted: #e9eff8;
-  --color-muted-foreground: #475569;
+  --color-background: #f3f1ee; /* arcilla gris de la Cancha de Bochas */
+  --color-foreground: #2a211c;
+  --color-muted: #eae5df;
+  --color-muted-foreground: #6b5d53;
   --color-card: #ffffff;
-  --color-card-foreground: #1e40af;
-  --color-border: #bfdbfe;
-  --color-destructive: #dc2626;
+  --color-card-foreground: #2a211c;
+  --color-border: #e0d8cf;
+  --color-destructive: #b42318;
   --color-on-destructive: #ffffff;
-  --color-ring: #2563eb;
+  --color-ring: #a3391e;
+  --color-success: #3d6b22; /* verde jarilla: pagado, listo, guardado */
+  /* Franja del header: cielo nocturno del parque */
+  --color-header: #16233f;
+  --color-on-header: #f3f1ee;
+  --color-header-muted: #b8c3d9;
 
   /* Shape */
   --radius-input: 8px;
   --radius-card: 12px;
 
   /* Elevación — una sola escala */
-  --shadow-sm: 0 1px 2px 0 rgb(30 64 175 / 0.06);
-  --shadow: 0 2px 8px -1px rgb(30 64 175 / 0.1);
-  --shadow-md: 0 6px 16px -2px rgb(30 64 175 / 0.14);
+  --shadow-sm: 0 1px 2px 0 rgb(42 33 28 / 0.06);
+  --shadow: 0 2px 8px -1px rgb(42 33 28 / 0.09);
+  --shadow-md: 0 6px 16px -2px rgb(42 33 28 / 0.13);
 }
 
 /* Dark por preferencia del sistema (salvo override explícito a light) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-primary: #3b82f6;
-    --color-on-primary: #06122b;
-    --color-primary-hover: #60a5fa;
-    --color-secondary: #60a5fa;
-    --color-on-secondary: #06122b;
-    --color-accent: #22c55e;
-    --color-on-accent: #052e16;
+    --color-primary: #e8825f;
+    --color-on-primary: #1a0a04;
+    --color-primary-hover: #f09a7b;
+    --color-secondary: #8db3e8;
+    --color-on-secondary: #0d1424;
+    --color-accent: #e8b04f;
+    --color-on-accent: #241505;
     --color-whatsapp: #25d366;
     --color-on-whatsapp: #052e16;
-    --color-background: #0a0f1a;
-    --color-foreground: #e6eefb;
-    --color-muted: #16202e;
-    --color-muted-foreground: #9fb3cd;
-    --color-card: #111a28;
-    --color-card-foreground: #e6eefb;
-    --color-border: #24303f;
+    --color-background: #0d1424;
+    --color-foreground: #ede7e0;
+    --color-muted: #1c2842;
+    --color-muted-foreground: #a9b4c9;
+    --color-card: #151f35;
+    --color-card-foreground: #ede7e0;
+    --color-border: #2a3754;
     --color-destructive: #f87171;
     --color-on-destructive: #1a0606;
-    --color-ring: #60a5fa;
+    --color-ring: #e8825f;
+    --color-success: #9ccc72;
+    --color-header: #0a1020;
+    --color-on-header: #ede7e0;
+    --color-header-muted: #9aa8c2;
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
     --shadow: 0 2px 8px -1px rgb(0 0 0 / 0.55);
@@ -71,25 +79,29 @@
 
 /* Dark forzado por toggle */
 :root[data-theme="dark"] {
-  --color-primary: #3b82f6;
-  --color-on-primary: #06122b;
-  --color-primary-hover: #60a5fa;
-  --color-secondary: #60a5fa;
-  --color-on-secondary: #06122b;
-  --color-accent: #22c55e;
-  --color-on-accent: #052e16;
+  --color-primary: #e8825f;
+  --color-on-primary: #1a0a04;
+  --color-primary-hover: #f09a7b;
+  --color-secondary: #8db3e8;
+  --color-on-secondary: #0d1424;
+  --color-accent: #e8b04f;
+  --color-on-accent: #241505;
   --color-whatsapp: #25d366;
   --color-on-whatsapp: #052e16;
-  --color-background: #0a0f1a;
-  --color-foreground: #e6eefb;
-  --color-muted: #16202e;
-  --color-muted-foreground: #9fb3cd;
-  --color-card: #111a28;
-  --color-card-foreground: #e6eefb;
-  --color-border: #24303f;
+  --color-background: #0d1424;
+  --color-foreground: #ede7e0;
+  --color-muted: #1c2842;
+  --color-muted-foreground: #a9b4c9;
+  --color-card: #151f35;
+  --color-card-foreground: #ede7e0;
+  --color-border: #2a3754;
   --color-destructive: #f87171;
   --color-on-destructive: #1a0606;
-  --color-ring: #60a5fa;
+  --color-ring: #e8825f;
+  --color-success: #9ccc72;
+  --color-header: #0a1020;
+  --color-on-header: #ede7e0;
+  --color-header-muted: #9aa8c2;
 
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
   --shadow: 0 2px 8px -1px rgb(0 0 0 / 0.55);
@@ -121,6 +133,18 @@
     text-wrap: pretty;
   }
 
+  /* Superficies del navegador con la paleta del sitio. */
+  html {
+    accent-color: var(--color-primary);
+    caret-color: var(--color-primary);
+    scrollbar-color: var(--color-border) var(--color-background);
+  }
+
+  ::selection {
+    background-color: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+
   /* Focus visible real (accesibilidad) */
   :focus-visible {
     outline: 2px solid var(--color-ring);
@@ -141,7 +165,7 @@
 @layer components {
   /* Flecha de los <select> nativos (accesibles y livianos en mobile). */
   .select-chevron {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b5d53' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-position: right 0.6rem center;
   }
 }

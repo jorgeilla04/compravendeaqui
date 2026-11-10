@@ -33,6 +33,12 @@ const config: Config = {
           DEFAULT: "var(--color-accent)",
           foreground: "var(--color-on-accent)",
         },
+        success: "var(--color-success)",
+        header: {
+          DEFAULT: "var(--color-header)",
+          foreground: "var(--color-on-header)",
+          muted: "var(--color-header-muted)",
+        },
         whatsapp: {
           DEFAULT: "var(--color-whatsapp)",
           foreground: "var(--color-on-whatsapp)",

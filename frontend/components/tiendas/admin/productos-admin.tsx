@@ -297,7 +297,7 @@ function ProductoRow({
         />
       </label>
       {message ? (
-        <p className="text-meta text-accent" role="status">
+        <p className="text-meta text-success" role="status">
           {message}
         </p>
       ) : null}
