@@ -50,7 +50,7 @@ TIPOS_ILUSTRACION = (
     "generico",
 )
 # Rutas de la tienda (/tiendas/<tienda>/<grupo>): un grupo no puede llamarse así.
-RESERVED_SLUGS = {"admin", "carrito", "pedido"}
+RESERVED_SLUGS = {"admin", "carrito", "pedido", "demo-pago"}
 NOT_FOUND = "No encontramos ese pedido"
 
 

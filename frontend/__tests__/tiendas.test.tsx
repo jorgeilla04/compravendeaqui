@@ -15,6 +15,7 @@ import {
   filterGrupos,
   GrupoExplorer,
 } from "@/components/tiendas/grupo-explorer";
+import { DemoPago } from "@/components/tiendas/demo-pago";
 import { GrupoLogo } from "@/components/tiendas/grupo-logo";
 import { PedidoEstado, POLL_MS } from "@/components/tiendas/pedido-estado";
 import { ProductoCard } from "@/components/tiendas/producto-card";
@@ -1195,5 +1196,45 @@ describe("administración de tiendas", () => {
     expect(
       screen.queryByRole("heading", { name: "Abrir una tienda nueva" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("DemoPago", () => {
+  it("recorre carrito, pago simulado y resultado", async () => {
+    const user = userEvent.setup();
+    render(<DemoPago tienda={uniformes} />);
+    expect(screen.getByRole("note")).toHaveTextContent(/no se\s+cobra nada/i);
+    const t = cotizar(20000, "estandar", "sena", uniformes);
+    const pagar = screen.getByRole("button", {
+      name: `Pagar ${pesosLabel(t.pagadoAhora)} con Mercado Pago`,
+    });
+    await user.click(pagar);
+    expect(
+      screen.getByRole("heading", { name: "El cliente paga en Mercado Pago" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByLabelText(/queda pendiente/i));
+    await user.click(
+      screen.getByRole("button", { name: "Ver qué pasa después" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Pago pendiente" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Empezar de nuevo" }));
+    await user.click(screen.getByLabelText("Todo ahora"));
+    const total = cotizar(20000, "estandar", "total", uniformes);
+    await user.click(
+      screen.getByRole("button", {
+        name: `Pagar ${pesosLabel(total.pagadoAhora)} con Mercado Pago`,
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Ver qué pasa después" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Pago aprobado" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Lo que recibe Virginia Tello/),
+    ).toBeInTheDocument();
   });
 });
