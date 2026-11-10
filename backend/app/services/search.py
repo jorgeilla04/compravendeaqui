@@ -24,7 +24,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Session
 
-from app.models import Category, Listing
+from app.models import Category, Listing, User
 from app.services import categories as category_service
 from app.services.fx import get_usd_ars_rate
 
@@ -61,10 +61,21 @@ def ts_query(q: str) -> ColumnElement[Any]:
 
 def visible_listing_filter() -> ColumnElement[bool]:
     now = datetime.now(UTC)
+    # Los avisos de una cuenta suspendida o dada de baja no se muestran.
+    dueno_activo = (
+        select(User.id)
+        .where(
+            User.id == Listing.user_id,
+            User.is_active.is_(True),
+            User.deleted_at.is_(None),
+        )
+        .exists()
+    )
     return and_(
         Listing.deleted_at.is_(None),
         Listing.status == "active",
         or_(Listing.expires_at.is_(None), Listing.expires_at > now),
+        dueno_activo,
     )
 
 

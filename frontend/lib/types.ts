@@ -94,6 +94,8 @@ export interface Listing extends ListingCard {
 export interface OwnerListing extends Listing {
   views_count: number;
   contacts_count: number;
+  /** Motivo de moderación (solo si está suspendido). */
+  moderation_reason?: string | null;
 }
 
 export interface ListingPage {

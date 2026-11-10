@@ -4,6 +4,7 @@ from app.models.auth import OtpCode, RefreshToken
 from app.models.base import Base
 from app.models.category import Category
 from app.models.listing import Listing, ListingImage
+from app.models.moderation import ModerationLog
 from app.models.tiendas import (
     Grupo,
     Pedido,
@@ -21,6 +22,7 @@ __all__ = [
     "Grupo",
     "Listing",
     "ListingImage",
+    "ModerationLog",
     "OtpCode",
     "Pedido",
     "PedidoItem",

@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, Camera, Store } from "lucide-react";
+import { BadgeCheck, Camera, ShieldCheck, Store } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import * as React from "react";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormMessage, TextField } from "@/components/ui/form";
 import { api, errorMessage } from "@/lib/api";
+import { puedeModerar } from "@/lib/moderacion";
 import type { Me } from "@/lib/types";
 
 export default function PerfilPage() {
@@ -49,6 +50,14 @@ function ProfileEditor() {
           <Link href="/tiendas/admin">
             <Store aria-hidden="true" />
             Mis tiendas: pedidos, productos, precios y colegios
+          </Link>
+        </Button>
+      ) : null}
+      {puedeModerar(me.role) ? (
+        <Button asChild variant="outline" className="w-full justify-start">
+          <Link href="/admin/moderacion">
+            <ShieldCheck aria-hidden="true" />
+            Moderación: dar de baja avisos y usuarios
           </Link>
         </Button>
       ) : null}

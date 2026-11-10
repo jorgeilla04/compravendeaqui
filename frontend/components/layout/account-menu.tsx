@@ -1,11 +1,12 @@
 "use client";
 
-import { LogOut, Settings, Store, User } from "lucide-react";
+import { LogOut, Settings, ShieldCheck, Store, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
+import { puedeModerar } from "@/lib/moderacion";
 
 /** Acceso a la cuenta en el header (desktop). En mobile está en la bottom nav. */
 export function AccountMenu() {
@@ -43,6 +44,15 @@ export function AccountMenu() {
           >
             <Store aria-hidden="true" className="size-4" />
             Mis tiendas
+          </Link>
+        ) : null}
+        {puedeModerar(user.role) ? (
+          <Link
+            href="/admin/moderacion"
+            className="inline-flex items-center gap-2 px-3 py-2.5 text-base hover:bg-muted"
+          >
+            <ShieldCheck aria-hidden="true" className="size-4" />
+            Moderación
           </Link>
         ) : null}
         <Link

@@ -71,6 +71,9 @@ class Listing(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Moderación: motivo visible para el dueño cuando status == "suspended".
+    moderation_reason: Mapped[str | None] = mapped_column(Text)
+    moderated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     category: Mapped[Category] = relationship(lazy="joined")
     user: Mapped[User] = relationship(lazy="joined")

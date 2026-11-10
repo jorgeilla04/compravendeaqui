@@ -91,6 +91,7 @@ def to_out(listing: Listing, owner: bool = False) -> ListingOut | OwnerListingOu
             **data,
             views_count=listing.views_count,
             contacts_count=listing.contacts_count,
+            moderation_reason=listing.moderation_reason,
         )
     return ListingOut(**data)
 

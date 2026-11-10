@@ -117,6 +117,9 @@ function ListingRow({
             {listing.status === "suspended" ? (
               <p className="text-meta text-foreground">
                 Suspendido por moderación: no se muestra en el sitio.
+                {listing.moderation_reason
+                  ? ` Motivo: ${listing.moderation_reason}`
+                  : ""}
               </p>
             ) : null}
           </div>
