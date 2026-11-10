@@ -50,6 +50,8 @@ export interface Me extends PublicUser {
   whatsapp_optin: boolean;
   profile_pending: boolean;
   has_password: boolean;
+  /** Admin del sitio o encargado de alguna tienda. */
+  gestiona_tiendas?: boolean;
 }
 
 export interface ListingImage {

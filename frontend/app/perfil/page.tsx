@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, Camera } from "lucide-react";
+import { BadgeCheck, Camera, Store } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import * as React from "react";
@@ -44,6 +44,14 @@ function ProfileEditor() {
           </Link>
         </p>
       </header>
+      {me.gestiona_tiendas ? (
+        <Button asChild variant="outline" className="w-full justify-start">
+          <Link href="/tiendas/admin">
+            <Store aria-hidden="true" />
+            Mis tiendas: pedidos, productos, precios y colegios
+          </Link>
+        </Button>
+      ) : null}
       <AvatarSection me={me} onSaved={setUser} />
       <DetailsForm me={me} onSaved={setUser} />
     </div>

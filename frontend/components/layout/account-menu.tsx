@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, Store, User } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -36,6 +36,15 @@ export function AccountMenu() {
         <Link href="/perfil" className="px-3 py-2.5 text-base hover:bg-muted">
           Mi perfil
         </Link>
+        {user.gestiona_tiendas ? (
+          <Link
+            href="/tiendas/admin"
+            className="inline-flex items-center gap-2 px-3 py-2.5 text-base hover:bg-muted"
+          >
+            <Store aria-hidden="true" className="size-4" />
+            Mis tiendas
+          </Link>
+        ) : null}
         <Link
           href="/ajustes"
           className="inline-flex items-center gap-2 px-3 py-2.5 text-base hover:bg-muted"

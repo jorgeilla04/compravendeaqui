@@ -37,6 +37,8 @@ class MeOut(PublicUserOut):
     whatsapp_optin: bool
     profile_pending: bool
     has_password: bool
+    # Admin del sitio o encargado de alguna tienda: ve el panel de tiendas.
+    gestiona_tiendas: bool = False
 
 
 class UserUpdateIn(BaseModel):
