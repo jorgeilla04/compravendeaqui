@@ -157,6 +157,10 @@ function ProductoRow({
   opcionLabel: string;
   onSaved: (p: ProductoAdmin) => void;
 }) {
+  const [nombre, setNombre] = React.useState(producto.nombre);
+  const [descripcion, setDescripcion] = React.useState(
+    producto.descripcion ?? "",
+  );
   const [precio, setPrecio] = React.useState(
     String(Number(producto.precio_base)),
   );
@@ -170,11 +174,17 @@ function ProductoRow({
   async function save() {
     setMessage(null);
     setError(null);
+    if (nombre.trim().length < 2) {
+      setError("El nombre necesita al menos 2 letras.");
+      return;
+    }
     try {
       onSaved(
         await api<ProductoAdmin>(path, {
           method: "PUT",
           body: {
+            nombre: nombre.trim(),
+            descripcion: descripcion.trim() || null,
             precio_base: precio || "0",
             opciones: parseOpciones(opciones),
             activo,
@@ -206,6 +216,23 @@ function ProductoRow({
   return (
     <li className="flex flex-col gap-3 rounded-card border border-border bg-card p-3">
       <h4 className="font-semibold">{producto.nombre}</h4>
+      <TextField
+        id={`${id}-nombre`}
+        label="Nombre"
+        value={nombre}
+        onChange={(e) => setNombre(e.target.value)}
+        maxLength={120}
+      />
+      <TextAreaField
+        id={`${id}-descripcion`}
+        label="Descripción"
+        optional
+        hint="La ven los clientes en la ficha del producto."
+        rows={2}
+        maxLength={1000}
+        value={descripcion}
+        onChange={(e) => setDescripcion(e.target.value)}
+      />
       <div className="flex flex-wrap items-end gap-3">
         <label
           htmlFor={id}

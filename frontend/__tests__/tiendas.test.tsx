@@ -916,6 +916,10 @@ describe("administración de tiendas", () => {
           foto_url: "https://cdn.test/remera-sr.webp",
         },
       }),
+      "PUT /admin/tiendas/uniformes/precios": (body) => ({
+        status: 200,
+        json: { ...(body as object), foto_url: null },
+      }),
     });
     renderPanel();
     await user.click(await screen.findByRole("button", { name: "Colegios" }));
@@ -940,6 +944,23 @@ describe("administración de tiendas", () => {
       await screen.findByLabelText(/Remera \/ chomba · foto de este colegio/),
     ).toBeInTheDocument();
 
+    const precioRemera = screen.getByLabelText("Precio en este colegio ($)", {
+      selector: "#foto-santa-rosa-remera-precio",
+    });
+    await user.type(precioRemera, "12000");
+    await user.click(
+      screen.getByRole("button", { name: "Guardar precio de Remera / chomba" }),
+    );
+    expect(await screen.findByText("Guardado.")).toBeVisible();
+    expect(
+      calls.find((c) => c.key === "PUT /admin/tiendas/uniformes/precios")?.body,
+    ).toEqual({
+      grupo: "santa-rosa",
+      producto: "remera",
+      precio: "12000",
+      disponible: true,
+    });
+
     await user.click(
       screen.getByRole("button", {
         name: "Quitar foto 1 de Colegio Santa Rosa de Lima",
@@ -952,6 +973,48 @@ describe("administración de tiendas", () => {
         }),
       ).not.toBeInTheDocument(),
     );
+  });
+
+  it("edita nombre y descripción de un producto", async () => {
+    const user = userEvent.setup();
+    const calls = mockApi({
+      "GET /auth/me": () => ({ status: 200, json: me("user") }),
+      "GET /admin/tiendas/uniformes/catalogo": () => ({
+        status: 200,
+        json: catalogo,
+      }),
+      "GET /admin/tiendas/uniformes/pedidos": () => ({ status: 200, json: [] }),
+      "PUT /admin/tiendas/uniformes/productos/remera": (body) => ({
+        status: 200,
+        json: { ...catalogo.productos[0], ...(body as object) },
+      }),
+    });
+    renderPanel();
+    await user.click(
+      await screen.findByRole("button", { name: "Productos y precios" }),
+    );
+    const nombre = screen.getByLabelText("Nombre", {
+      selector: "#base-remera-nombre",
+    });
+    await user.clear(nombre);
+    await user.type(nombre, "Chomba piqué");
+    await user.type(
+      screen.getByLabelText(/Descripción/, {
+        selector: "#base-remera-descripcion",
+      }),
+      "Algodón, con escudo bordado",
+    );
+    const fila = nombre.closest("li") as HTMLElement;
+    await user.click(within(fila).getByRole("button", { name: "Guardar" }));
+    expect(await within(fila).findByText("Guardado.")).toBeVisible();
+    expect(
+      calls.find(
+        (c) => c.key === "PUT /admin/tiendas/uniformes/productos/remera",
+      )?.body,
+    ).toMatchObject({
+      nombre: "Chomba piqué",
+      descripcion: "Algodón, con escudo bordado",
+    });
   });
 
   it("el dueño gestiona pedidos, grupos, productos y la config de envío y pagos", async () => {
