@@ -115,6 +115,8 @@ class OwnerListingOut(ListingOut):
 
     views_count: int
     contacts_count: int
+    # Motivo de moderación (solo si el aviso está suspendido).
+    moderation_reason: str | None = None
 
 
 class ListingPage(BaseModel):

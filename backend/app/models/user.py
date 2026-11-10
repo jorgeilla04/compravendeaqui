@@ -40,6 +40,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     profile_pending: Mapped[bool] = mapped_column(Boolean, default=True)
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    suspension_reason: Mapped[str | None] = mapped_column(Text)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     @property
