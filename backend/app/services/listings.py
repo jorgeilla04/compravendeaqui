@@ -215,6 +215,37 @@ def soft_delete(db: Session, listing: Listing) -> None:
 # --- Imágenes ----------------------------------------------------------------
 
 
+def store_image(listing: Listing, raw: bytes, order: int) -> ListingImage:
+    """Procesa una foto, la sube al storage y devuelve la fila (sin guardar)."""
+    try:
+        processed = image_service.process_image(raw)
+    except image_service.InvalidImageError as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+    base = f"listings/{listing.id}/{uuid.uuid4().hex}"
+    try:
+        full_url = storage.put_object(f"{base}.webp", processed.full, "image/webp")
+        thumb_url = storage.put_object(
+            f"{base}_thumb.webp", processed.thumb, "image/webp"
+        )
+    except storage.StorageError as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    return ListingImage(
+        url=full_url,
+        thumb_url=thumb_url,
+        storage_key=base,
+        width=processed.width,
+        height=processed.height,
+        size_bytes=len(processed.full),
+        display_order=order,
+        is_primary=order == 0,
+    )
+
+
 async def add_images(db: Session, listing: Listing, files: list[UploadFile]) -> Listing:
     current = len(listing.images)
     if current + len(files) > settings.image_max_per_listing:
@@ -230,36 +261,7 @@ async def add_images(db: Session, listing: Listing, files: list[UploadFile]) -> 
                 status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail=f"Cada foto puede pesar hasta {settings.image_max_upload_mb} MB",
             )
-        try:
-            processed = image_service.process_image(raw)
-        except image_service.InvalidImageError as exc:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-            ) from exc
-
-        base = f"listings/{listing.id}/{uuid.uuid4().hex}"
-        try:
-            full_url = storage.put_object(f"{base}.webp", processed.full, "image/webp")
-            thumb_url = storage.put_object(
-                f"{base}_thumb.webp", processed.thumb, "image/webp"
-            )
-        except storage.StorageError as exc:
-            raise HTTPException(
-                status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
-            ) from exc
-
-        listing.images.append(
-            ListingImage(
-                url=full_url,
-                thumb_url=thumb_url,
-                storage_key=base,
-                width=processed.width,
-                height=processed.height,
-                size_bytes=len(processed.full),
-                display_order=current + index,
-                is_primary=current + index == 0,
-            )
-        )
+        listing.images.append(store_image(listing, raw, current + index))
     db.commit()
     db.refresh(listing)
     return listing

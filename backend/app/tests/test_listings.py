@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import unquote
@@ -10,6 +11,7 @@ from urllib.parse import unquote
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from app.scripts.importar_avisos import main as importar_avisos
 from app.tests.conftest import create_listing, jpeg_bytes
 
 MakeUser = Callable[..., tuple[TestClient, dict[str, Any]]]
@@ -295,3 +297,41 @@ def test_suspended_listing_photos_are_locked(
         seller.put(f"{base}/order", json={"image_ids": [image_id]}).status_code == 409
     )
     assert seller.delete(f"{base}/{image_id}").status_code == 409
+
+
+def test_script_importar_avisos(
+    make_user: MakeUser, fake_storage: dict[str, bytes], tmp_path: Any
+) -> None:
+    client, me = make_user()
+    usuario = me["user"]["username"]
+    (tmp_path / "fotos").mkdir()
+    (tmp_path / "fotos" / "a.jpg").write_bytes(jpeg_bytes((600, 400)))
+    aviso = {
+        "titulo": "Heladera con freezer Kanji Serie 140",
+        "descripcion": "Capacidad neta 138 L. Modelo KJH-HD140.",
+        "categoria": "electrodomesticos",
+        "precio": 549999,
+        "departamento": "Capital",
+        "fotos": ["fotos/a.jpg"],
+    }
+    archivo = tmp_path / "lista.json"
+    archivo.write_text(json.dumps({"usuario": usuario, "avisos": [aviso]}))
+
+    assert importar_avisos([str(archivo), "--dry-run"]) == (
+        "1 avisos válidos (sin publicar)"
+    )
+    assert client.get("/api/v1/users/me/listings").json() == []
+    assert importar_avisos([str(archivo)]) == "1 avisos nuevos y 0 actualizados de 1"
+
+    archivo.write_text(
+        json.dumps({"usuario": usuario, "avisos": [{**aviso, "precio": 599999}]})
+    )
+    assert importar_avisos([str(archivo)]) == "0 avisos nuevos y 1 actualizados de 1"
+    mios = client.get("/api/v1/users/me/listings").json()
+    assert len(mios) == 1
+    detalle = client.get(f"/api/v1/listings/{mios[0]['id']}").json()
+    assert float(detalle["price"]) == 599999
+    assert detalle["condition"] == "nuevo"
+    assert detalle["category"]["slug"] == "electrodomesticos"
+    assert len(detalle["images"]) == 1
+    assert len(fake_storage) == 2
