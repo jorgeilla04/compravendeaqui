@@ -84,7 +84,7 @@ function ListingRow({
                 alt=""
                 fill
                 sizes="96px"
-                className="object-cover"
+                className="bg-white object-contain p-1"
               />
             ) : (
               <div className="flex size-full items-center justify-center text-muted-foreground">
