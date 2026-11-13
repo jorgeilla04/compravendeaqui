@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app.api.deps import DbSession
 from app.core import ratelimit
-from app.core.redis import get_redis
 from app.schemas.transporte import (
     ConsultaCreadaOut,
     ConsultaIn,
@@ -167,22 +166,23 @@ def reservar(
     )
     found = service.get_transportista(db, slug)
     paquete = paquetes.get_paquete(db, found, paquete_slug)
-    # Además del límite por IP, uno por email (en todo el sitio): los mails de
-    # reserva no sirven para escribirle a alguien una y otra vez. El lugar en
-    # el contador se toma de forma atómica y se devuelve si la reserva no se
-    # hace: los intentos fallidos no bloquean el email de nadie.
-    clave = paquetes.clave_email(body.email)
+    # Además del límite por IP, uno por email y empresa: los mails de reserva
+    # no sirven para escribirle a alguien una y otra vez. El lugar en el
+    # contador se toma de forma atómica y se devuelve si la reserva no llega a
+    # guardarse: los intentos fallidos no bloquean el email de nadie.
+    clave = paquetes.clave_email(found, body.email)
     permitido, _ = ratelimit.hit(clave, paquetes.RESERVAS_POR_EMAIL, 86400)
     if not permitido:
-        get_redis().decr(clave)
+        ratelimit.refund(clave, 86400)
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             detail="No pudimos tomar la reserva. Escribinos por WhatsApp.",
         )
     try:
         reserva = paquetes.reservar(db, found, paquete, body)
-    except Exception:
-        get_redis().decr(clave)
+    except HTTPException:
+        # Sin lugar o salida inexistente: la reserva no se guardó.
+        ratelimit.refund(clave, 86400)
         raise
     paquetes.notificar_reserva(reserva)
     return ReservaCreadaOut(

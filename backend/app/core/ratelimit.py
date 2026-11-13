@@ -22,6 +22,24 @@ def hit(key: str, limit: int, window_seconds: int) -> tuple[bool, int]:
     return int(count) <= limit, max(int(ttl), 0)
 
 
+_DEVOLVER = """
+local n = tonumber(redis.call('GET', KEYS[1]) or '0')
+if n > 0 then
+  redis.call('DECR', KEYS[1])
+  if redis.call('TTL', KEYS[1]) < 0 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+  end
+end
+return n
+"""
+
+
+def refund(key: str, window_seconds: int) -> None:
+    """Devuelve un evento contado con hit(): nunca baja de 0 y la clave
+    conserva su vencimiento (atómico, en Redis)."""
+    get_redis().eval(_DEVOLVER, 1, key, window_seconds)
+
+
 def enforce(key: str, limit: int, window_seconds: int, detail: str) -> None:
     allowed, retry_after = hit(key, limit, window_seconds)
     if not allowed:
