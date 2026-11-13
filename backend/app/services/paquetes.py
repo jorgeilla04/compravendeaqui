@@ -247,11 +247,12 @@ def cambiar_estado(db: Session, reserva: Reserva, estado: str) -> None:
 RESERVAS_POR_EMAIL = 3
 
 
-def clave_email(email: str) -> str:
-    """Una clave por email para todo el sitio (con hash: sin datos personales
-    en Redis)."""
+def clave_email(transportista: Transportista, email: str) -> str:
+    """Una clave por empresa y email (con hash: sin datos personales en
+    Redis). Por empresa: quien abuse del email de otro solo lo bloquea en
+    esa agencia, no en todo el sitio."""
     digest = hashlib.sha256(email.strip().lower().encode()).hexdigest()[:32]
-    return f"rl:paquetes:reserva:email:{digest}"
+    return f"rl:paquetes:reserva:{transportista.id}:{digest}"
 
 
 def whatsapp_reserva(reserva: Reserva) -> str:
