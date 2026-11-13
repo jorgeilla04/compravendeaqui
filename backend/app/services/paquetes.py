@@ -244,15 +244,24 @@ def cambiar_estado(db: Session, reserva: Reserva, estado: str) -> None:
     db.commit()
 
 
-RESERVAS_POR_EMAIL = 3
+RESERVAS_POR_EMAIL = 3  # por empresa
+RESERVAS_POR_EMAIL_SITIO = 6  # tope de la casilla en todo el sitio
 
 
-def clave_email(transportista: Transportista, email: str) -> str:
-    """Una clave por empresa y email (con hash: sin datos personales en
-    Redis). Por empresa: quien abuse del email de otro solo lo bloquea en
-    esa agencia, no en todo el sitio."""
-    digest = hashlib.sha256(email.strip().lower().encode()).hexdigest()[:32]
-    return f"rl:paquetes:reserva:{transportista.id}:{digest}"
+def _digest(email: str) -> str:
+    """Hash del email: sin datos personales en Redis."""
+    return hashlib.sha256(email.strip().lower().encode()).hexdigest()[:32]
+
+
+def claves_email(transportista: Transportista, email: str) -> list[tuple[str, int]]:
+    """Contadores (clave, tope) de reservas por email: uno por empresa (quien
+    use el email de otro lo bloquea como mucho en una agencia) y uno del sitio
+    (ninguna casilla recibe más de 6 mails de reserva por día)."""
+    digest = _digest(email)
+    return [
+        (f"rl:paquetes:email:emp:{transportista.id}:{digest}", RESERVAS_POR_EMAIL),
+        (f"rl:paquetes:email:sitio:{digest}", RESERVAS_POR_EMAIL_SITIO),
+    ]
 
 
 def whatsapp_reserva(reserva: Reserva) -> str:
