@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { Isologo } from "@/components/brand/isologo";
 import { AccountMenu } from "@/components/layout/account-menu";
 import { SearchBar } from "@/components/layout/search-bar";
 import { Button } from "@/components/ui/button";
@@ -27,9 +28,12 @@ export function SiteHeader() {
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 pb-3 pt-3 md:flex-nowrap md:pb-2">
         <Link
           href="/"
-          className="shrink-0 rounded-input font-heading text-h3 font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex shrink-0 items-center gap-2 rounded-input font-heading text-h3 font-bold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          CompraVende<span className="text-accent">Aqui</span>
+          <Isologo className="h-8 w-auto" />
+          <span>
+            CompraVende<span className="text-accent">Aqui</span>
+          </span>
         </Link>
         <Suspense
           fallback={
