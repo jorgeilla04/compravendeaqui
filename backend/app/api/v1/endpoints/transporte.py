@@ -166,14 +166,19 @@ def reservar(
     )
     found = service.get_transportista(db, slug)
     paquete = paquetes.get_paquete(db, found, paquete_slug)
-    # Además del límite por IP, uno por email y empresa: los mails de reserva
-    # no sirven para escribirle a alguien una y otra vez. El lugar en el
-    # contador se toma de forma atómica y se devuelve si la reserva no llega a
-    # guardarse: los intentos fallidos no bloquean el email de nadie.
-    clave = paquetes.clave_email(found, body.email)
-    permitido, _ = ratelimit.hit(clave, paquetes.RESERVAS_POR_EMAIL, 86400)
-    if not permitido:
-        ratelimit.refund(clave, 86400)
+    # Además del límite por IP, topes por email (por empresa y del sitio): los
+    # mails de reserva no sirven para escribirle a alguien una y otra vez. Los
+    # lugares en los contadores se toman de forma atómica y se devuelven si la
+    # reserva no llega a guardarse: los intentos fallidos no bloquean a nadie.
+    claves = paquetes.claves_email(found, body.email)
+    permitidos = [ratelimit.hit(clave, tope, 86400)[0] for clave, tope in claves]
+
+    def devolver() -> None:
+        for clave, _ in claves:
+            ratelimit.refund(clave, 86400)
+
+    if not all(permitidos):
+        devolver()
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             detail="No pudimos tomar la reserva. Escribinos por WhatsApp.",
@@ -182,7 +187,7 @@ def reservar(
         reserva = paquetes.reservar(db, found, paquete, body)
     except HTTPException:
         # Sin lugar o salida inexistente: la reserva no se guardó.
-        ratelimit.refund(clave, 86400)
+        devolver()
         raise
     paquetes.notificar_reserva(reserva)
     return ReservaCreadaOut(
