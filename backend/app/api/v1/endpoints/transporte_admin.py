@@ -304,6 +304,7 @@ def _salida(db: DbSession, paquete: Paquete, salida_id: uuid.UUID) -> Salida:
         select(Salida)
         .where(Salida.id == salida_id, Salida.paquete_id == paquete.id)
         .with_for_update()
+        .execution_options(populate_existing=True)
     ).first()
     if salida is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Esa salida no existe")
@@ -466,6 +467,8 @@ def borrar_salida(
 @router.get("/{slug}/reservas", response_model=list[ReservaAdminOut])
 def reservas(slug: str, user: CompleteUser, db: DbSession) -> list[ReservaAdminOut]:
     found = _transportista(db, user, slug)
+    # La agencia ve las vencidas ya canceladas y sus lugares devueltos.
+    paquetes.liberar_vencidas_de(db, found)
     rows = db.scalars(
         select(Reserva)
         .where(Reserva.transportista_id == found.id)
