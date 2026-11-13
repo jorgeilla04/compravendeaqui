@@ -244,12 +244,14 @@ def cambiar_estado(db: Session, reserva: Reserva, estado: str) -> None:
     db.commit()
 
 
-RESERVAS_POR_EMAIL = 5
+RESERVAS_POR_EMAIL = 3
 
 
-def clave_email(transportista: Transportista, email: str) -> str:
+def clave_email(email: str) -> str:
+    """Una clave por email para todo el sitio (con hash: sin datos personales
+    en Redis)."""
     digest = hashlib.sha256(email.strip().lower().encode()).hexdigest()[:32]
-    return f"rl:paquetes:reserva:{transportista.id}:{digest}"
+    return f"rl:paquetes:reserva:email:{digest}"
 
 
 def whatsapp_reserva(reserva: Reserva) -> str:
