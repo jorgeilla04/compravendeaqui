@@ -1,21 +1,13 @@
 import { Clock, ShieldCheck, Trophy } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cache } from "react";
 
 import { Cotizador } from "@/components/transporte/cotizador";
-import { serverGet } from "@/lib/api";
-import type { Transportista } from "@/lib/transporte/types";
+import { PaqueteCard } from "@/components/transporte/paquete-card";
+import { getPaquetes, getTransportista } from "@/lib/transporte/server";
 
 type Props = { params: { slug: string } };
-
-const getTransportista = cache((slug: string) =>
-  serverGet<Transportista>(
-    `/transporte/${encodeURIComponent(slug)}`,
-    undefined,
-    60,
-  ).catch(() => null),
-);
 
 const VALORES = [
   {
@@ -46,7 +38,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function TransportePage({ params }: Props) {
-  const transportista = await getTransportista(params.slug);
+  const [transportista, paquetes] = await Promise.all([
+    getTransportista(params.slug),
+    getPaquetes(params.slug),
+  ]);
   if (!transportista) notFound();
   return (
     <div className="flex flex-col gap-6">
@@ -91,6 +86,34 @@ export default async function TransportePage({ params }: Props) {
         ))}
       </ul>
       <Cotizador transportista={transportista} />
+      {paquetes?.length ? (
+        <section
+          aria-labelledby="paquetes-titulo"
+          className="flex flex-col gap-3"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2
+              id="paquetes-titulo"
+              className="font-heading text-h2 font-semibold"
+            >
+              Paquetes de viaje
+            </h2>
+            <Link
+              href={`/transporte/${transportista.slug}/paquetes`}
+              className="inline-flex min-h-11 items-center text-meta font-semibold text-primary underline-offset-4 hover:underline"
+            >
+              Ver los {paquetes.length} paquetes
+            </Link>
+          </div>
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {paquetes.slice(0, 3).map((p) => (
+              <li key={p.slug}>
+                <PaqueteCard transportista={transportista.slug} paquete={p} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

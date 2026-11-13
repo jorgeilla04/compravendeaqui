@@ -11,6 +11,7 @@ const transportista: Transportista = {
   descripcion: null,
   foto_url: null,
   iva_incluido: true,
+  whatsapp_url: "https://wa.me/5492644148579",
   unidades: [
     { id: "u1", nombre: "Combi", asientos: 15, foto_url: null },
     { id: "u2", nombre: "Minibús", asientos: 24, foto_url: null },
