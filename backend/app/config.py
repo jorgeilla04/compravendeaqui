@@ -124,6 +124,13 @@ class Settings(BaseSettings):
     # Texto que ve el comprador en el resumen de la tarjeta (máx. 22).
     mp_statement_descriptor: str = "COMPRAVENDEAQUI"
 
+    # --- Mapas (cotizador de transporte) ---
+    # Sugerencias de lugares (Photon) y distancia por ruta (OSRM), ambos sobre
+    # OpenStreetMap. Se consultan desde el backend: el navegador no habla con
+    # terceros.
+    photon_url: str = "https://photon.komoot.io/api/"
+    osrm_url: str = "https://router.project-osrm.org"
+
     # --- Cotización USD/ARS ---
     fx_api_url: str = "https://dolarapi.com/v1/dolares/blue"
     # Campo del JSON que se usa como cotización ("venta" o "compra").

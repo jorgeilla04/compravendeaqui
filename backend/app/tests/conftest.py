@@ -85,7 +85,8 @@ def _clean_state() -> Iterator[None]:
             text(
                 "TRUNCATE listing_images, listings, refresh_tokens, otp_codes, users, "
                 "tienda_pedido_items, tienda_pedidos, tienda_precios, "
-                "tienda_grupos, tienda_admins RESTART IDENTITY CASCADE"
+                "tienda_grupos, tienda_admins, transporte_pedidos, "
+                "transporte_admins RESTART IDENTITY CASCADE"
             )
         )
         # La tienda de uniformes y sus prendas vienen de la migración: se
@@ -105,6 +106,8 @@ def _clean_state() -> Iterator[None]:
             )
         )
         conn.execute(text(RESET_UNIFORMES))
+        for sql in RESET_TRANSPORTE:
+            conn.execute(text(sql))
     get_redis().flushdb()
 
 
@@ -119,6 +122,25 @@ UPDATE tiendas SET nombre = 'Uniformes escolares', activo = true,
     "Rivadavia", "Santa Lucía"]'
 WHERE slug = 'uniformes'
 """
+
+
+# Blanca Paloma y sus unidades vienen de la migración (tarifas de ejemplo).
+RESET_TRANSPORTE = [
+    """UPDATE transportistas SET nombre = 'Blanca Paloma · Transporte para '
+      || 'empresas', descripcion = 'Traslados de personal y eventos.',
+      minimo = 120000, espera_hora = 15000, iva_incluido = true,
+      tarifas_revisadas = false, activo = true, foto_url = NULL,
+      whatsapp = '+5492644148579',
+      email = 'administracion@blancapalomasrl.com.ar'
+    WHERE slug = 'blanca-paloma'""",
+    """DELETE FROM transporte_unidades WHERE nombre NOT IN ('Combi', 'Minibús',
+      'Colectivo', 'Colectivo doble piso')""",
+    """UPDATE transporte_unidades SET activo = true, foto_url = NULL,
+      precio_km = CASE nombre WHEN 'Combi' THEN 1300 WHEN 'Minibús' THEN 1700
+        WHEN 'Colectivo' THEN 2300 ELSE 2800 END,
+      asientos = CASE nombre WHEN 'Combi' THEN 15 WHEN 'Minibús' THEN 24
+        WHEN 'Colectivo' THEN 45 ELSE 60 END""",
+]
 
 
 class RecordingSender:

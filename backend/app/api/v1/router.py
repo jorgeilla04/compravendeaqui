@@ -11,6 +11,8 @@ from app.api.v1.endpoints import (
     seo,
     tiendas,
     tiendas_admin,
+    transporte,
+    transporte_admin,
     users,
 )
 
@@ -25,3 +27,5 @@ api_router.include_router(seo.router)
 api_router.include_router(tiendas.router)
 api_router.include_router(tiendas_admin.router)
 api_router.include_router(moderacion.router)
+api_router.include_router(transporte.router)
+api_router.include_router(transporte_admin.router)
