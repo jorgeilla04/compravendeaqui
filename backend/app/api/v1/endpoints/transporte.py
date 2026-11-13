@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app.api.deps import DbSession
 from app.core import ratelimit
+from app.core.redis import get_redis
 from app.schemas.transporte import (
     ConsultaCreadaOut,
     ConsultaIn,
@@ -130,14 +131,20 @@ def listar_paquetes(slug: str, db: DbSession) -> list[PaqueteResumenOut]:
 def ver_paquete(slug: str, paquete_slug: str, db: DbSession) -> PaqueteOut:
     found = service.get_transportista(db, slug)
     paquete = paquetes.get_paquete(db, found, paquete_slug)
-    paquetes.liberar_vencidas_paquete(db, paquete)
-    db.refresh(paquete)
+    vencidos = paquetes.vencidos_por_salida(db, paquete)
     return PaqueteOut(
         **PaqueteResumenOut.model_validate(paquete).model_dump(),
         descripcion=paquete.descripcion,
         incluye=paquete.incluye,
         salidas=[
-            SalidaOut.model_validate(s) for s in paquetes.salidas_visibles(paquete)
+            SalidaOut(
+                id=s.id,
+                nombre=s.nombre,
+                fecha=s.fecha,
+                precio_persona=s.precio_persona,
+                disponibles=min(s.cupos, s.disponibles + vencidos.get(s.id, 0)),
+            )
+            for s in paquetes.salidas_visibles(paquete)
         ],
         sena_pct=found.sena_pct,
         whatsapp_url=paquetes.whatsapp_paquete(paquete),
@@ -158,17 +165,19 @@ def reservar(
         3600,
         "Ya hiciste varias reservas. Si necesitás otra, escribinos por WhatsApp.",
     )
-    # Además del límite por IP, uno por email: no se puede usar para mandarle
-    # mails de reserva a una misma persona una y otra vez.
-    ratelimit.enforce(
-        f"rl:paquetes:reserva:email:{body.email.lower()}",
-        3,
-        86400,
-        "Ya hay reservas con ese email. Si necesitás otra, escribinos por WhatsApp.",
-    )
     found = service.get_transportista(db, slug)
     paquete = paquetes.get_paquete(db, found, paquete_slug)
+    # Además del límite por IP, uno por email (por empresa): los mails de
+    # reserva no sirven para escribirle a alguien una y otra vez. Solo cuentan
+    # las reservas hechas, así nadie bloquea el email de otro con intentos.
+    clave = paquetes.clave_email(found, body.email)
+    if int(get_redis().get(clave) or 0) >= paquetes.RESERVAS_POR_EMAIL:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="No pudimos tomar la reserva. Escribinos por WhatsApp.",
+        )
     reserva = paquetes.reservar(db, found, paquete, body)
+    ratelimit.hit(clave, paquetes.RESERVAS_POR_EMAIL, 86400)
     paquetes.notificar_reserva(reserva)
     return ReservaCreadaOut(
         codigo=reserva.codigo,

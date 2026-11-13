@@ -232,5 +232,29 @@ def test_reserva_sin_sena_vence(
     db.commit()
     assert client.get(url).json()["salidas"][0]["disponibles"] == 5
     (reserva,) = admin.get(f"{ADMIN}/reservas").json()
+    # Liberada de verdad: se pueden volver a reservar los 5.
+    r = client.post(
+        f"{url}/reservas",
+        json={
+            **CLIENTE,
+            "email": "otra@gmail.com",
+            "salida_id": salida_id,
+            "pasajeros": 5,
+        },
+    )
+    assert r.status_code == 201, r.text
     assert reserva["estado"] == "cancelada"
     assert "Vencida sin seña" in reserva["notas"]
+
+
+def test_limite_por_email_solo_cuenta_reservas_hechas(
+    client: TestClient, paquete: dict[str, Any]
+) -> None:
+    salida_id = paquete["salidas"][0]["id"]
+    url = f"{API}/paquetes/{paquete['slug']}/reservas"
+    # Intentos fallidos (sin lugar) no consumen el cupo del email.
+    for _ in range(6):
+        r = client.post(url, json={**CLIENTE, "salida_id": salida_id, "pasajeros": 9})
+        assert r.status_code == 409
+    r = client.post(url, json={**CLIENTE, "salida_id": salida_id, "pasajeros": 1})
+    assert r.status_code == 201, r.text

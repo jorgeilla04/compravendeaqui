@@ -3,14 +3,16 @@ consultas. Los importes y los cupos los controla siempre el servidor."""
 
 from __future__ import annotations
 
+import hashlib
 import html
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from urllib.parse import quote
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -76,6 +78,7 @@ def liberar_vencidas(db: Session, salida: Salida) -> None:
             Reserva.created_at < limite,
         )
         .with_for_update()
+        .execution_options(populate_existing=True)
     ).all()
     for reserva in vencidas:
         reserva.estado = "cancelada"
@@ -83,13 +86,37 @@ def liberar_vencidas(db: Session, salida: Salida) -> None:
         salida.reservados = max(0, salida.reservados - reserva.pasajeros)
 
 
-def liberar_vencidas_paquete(db: Session, paquete: Paquete) -> None:
-    for salida in paquete.salidas:
-        locked = db.scalars(
-            select(Salida).where(Salida.id == salida.id).with_for_update()
-        ).one()
-        liberar_vencidas(db, locked)
+def liberar_vencidas_de(db: Session, transportista: Transportista) -> None:
+    """Libera las reservas vencidas de todas las salidas del transportista.
+    Bloquea las salidas en un solo SELECT, en orden fijo (sin deadlocks)."""
+    salidas = db.scalars(
+        select(Salida)
+        .join(Paquete, Paquete.id == Salida.paquete_id)
+        .where(Paquete.transportista_id == transportista.id)
+        .order_by(Salida.id)
+        .with_for_update(of=Salida)
+        .execution_options(populate_existing=True)
+    ).all()
+    for salida in salidas:
+        liberar_vencidas(db, salida)
     db.commit()
+
+
+def vencidos_por_salida(db: Session, paquete: Paquete) -> dict[uuid.UUID, int]:
+    """Lugares de reservas sin seña ya vencidas (todavía sin liberar), para
+    mostrar la disponibilidad real sin tocar nada desde una página pública."""
+    limite = datetime.now(UTC) - VENCE_SIN_SENA
+    rows = db.execute(
+        select(Reserva.salida_id, func.sum(Reserva.pasajeros))
+        .join(Salida, Salida.id == Reserva.salida_id)
+        .where(
+            Salida.paquete_id == paquete.id,
+            Reserva.estado == "pendiente_sena",
+            Reserva.created_at < limite,
+        )
+        .group_by(Reserva.salida_id)
+    ).all()
+    return {salida_id: int(n) for salida_id, n in rows}
 
 
 def salidas_visibles(paquete: Paquete) -> list[Salida]:
@@ -145,6 +172,7 @@ def reservar(
         select(Salida)
         .where(Salida.id == body.salida_id, Salida.paquete_id == paquete.id)
         .with_for_update()
+        .execution_options(populate_existing=True)
     ).first()
     if salida is None or not salida.activo:
         raise HTTPException(
@@ -193,7 +221,10 @@ def cambiar_estado(db: Session, reserva: Reserva, estado: str) -> None:
     Salida y reserva se bloquean juntas: dos cambios a la vez no descuadran
     el contador."""
     salida = db.scalars(
-        select(Salida).where(Salida.id == reserva.salida_id).with_for_update()
+        select(Salida)
+        .where(Salida.id == reserva.salida_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).one()
     db.refresh(reserva, with_for_update=True)
     if estado == reserva.estado:
@@ -211,6 +242,14 @@ def cambiar_estado(db: Session, reserva: Reserva, estado: str) -> None:
         salida.reservados += reserva.pasajeros
     reserva.estado = estado
     db.commit()
+
+
+RESERVAS_POR_EMAIL = 5
+
+
+def clave_email(transportista: Transportista, email: str) -> str:
+    digest = hashlib.sha256(email.strip().lower().encode()).hexdigest()[:32]
+    return f"rl:paquetes:reserva:{transportista.id}:{digest}"
 
 
 def whatsapp_reserva(reserva: Reserva) -> str:
