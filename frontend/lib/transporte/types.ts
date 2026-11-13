@@ -18,6 +18,7 @@ export interface Transportista {
   descripcion: string | null;
   foto_url: string | null;
   iva_incluido: boolean;
+  whatsapp_url: string;
   unidades: Unidad[];
 }
 
@@ -95,6 +96,94 @@ export interface TransportistaAdmin {
   espera_hora: string;
   iva_incluido: boolean;
   tarifas_revisadas: boolean;
+  sena_pct: number;
+  datos_transferencia: string | null;
   activo: boolean;
   unidades: UnidadAdmin[];
+}
+
+// --- Paquetes -----------------------------------------------------------------
+
+export interface SalidaPaquete {
+  id: string;
+  nombre: string;
+  fecha: string | null;
+  precio_persona: string;
+  disponibles: number;
+}
+
+export interface PaqueteResumen {
+  slug: string;
+  titulo: string;
+  resumen: string;
+  foto_url: string | null;
+  dias: number | null;
+  noches: number | null;
+  precio_desde: string;
+}
+
+export interface Paquete extends PaqueteResumen {
+  descripcion: string | null;
+  incluye: string[];
+  salidas: SalidaPaquete[];
+  sena_pct: number;
+  whatsapp_url: string;
+}
+
+export interface ReservaCreada {
+  codigo: string;
+  total: string;
+  sena: string;
+  sena_pct: number;
+  datos_transferencia: string | null;
+  whatsapp_url: string;
+}
+
+export interface SalidaAdmin extends SalidaPaquete {
+  cupos: number;
+  reservados: number;
+  activo: boolean;
+}
+
+export interface PaqueteAdmin extends PaqueteResumen {
+  descripcion: string | null;
+  incluye: string[];
+  orden: number;
+  activo: boolean;
+  salidas: SalidaAdmin[];
+}
+
+export type EstadoReserva =
+  | "pendiente_sena"
+  | "senada"
+  | "confirmada"
+  | "cancelada";
+
+export interface ReservaAdmin {
+  id: string;
+  codigo: string;
+  estado: EstadoReserva;
+  paquete_titulo: string;
+  salida_nombre: string;
+  pasajeros: number;
+  precio_persona: string;
+  total: string;
+  sena: string;
+  nombre: string;
+  email: string;
+  telefono: string;
+  dni: string | null;
+  notas: string | null;
+  created_at: string;
+}
+
+export interface ConsultaAdmin {
+  id: string;
+  paquete_titulo: string | null;
+  nombre: string;
+  telefono: string;
+  email: string | null;
+  mensaje: string | null;
+  estado: "nueva" | "respondida";
+  created_at: string;
 }

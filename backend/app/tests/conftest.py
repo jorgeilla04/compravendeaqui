@@ -86,7 +86,8 @@ def _clean_state() -> Iterator[None]:
                 "TRUNCATE listing_images, listings, refresh_tokens, otp_codes, users, "
                 "tienda_pedido_items, tienda_pedidos, tienda_precios, "
                 "tienda_grupos, tienda_admins, transporte_pedidos, "
-                "transporte_admins RESTART IDENTITY CASCADE"
+                "transporte_admins, paquete_consultas, paquete_reservas, "
+                "paquete_salidas, paquetes RESTART IDENTITY CASCADE"
             )
         )
         # La tienda de uniformes y sus prendas vienen de la migración: se
@@ -130,6 +131,7 @@ RESET_TRANSPORTE = [
       || 'empresas', descripcion = 'Traslados de personal y eventos.',
       minimo = 120000, espera_hora = 15000, iva_incluido = true,
       tarifas_revisadas = false, activo = true, foto_url = NULL,
+      sena_pct = 30, datos_transferencia = NULL,
       whatsapp = '+5492644148579',
       email = 'administracion@blancapalomasrl.com.ar'
     WHERE slug = 'blanca-paloma'""",

@@ -20,6 +20,11 @@ import {
   TextField,
 } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ConsultasAdmin,
+  PaquetesAdmin,
+  ReservasAdmin,
+} from "@/components/transporte/admin-paquetes";
 import { api, errorMessage } from "@/lib/api";
 import { pesosLabel } from "@/lib/tiendas/cotizar";
 import type {
@@ -28,6 +33,7 @@ import type {
   TransportistaAdmin,
   UnidadAdmin,
 } from "@/lib/transporte/types";
+import { cn } from "@/lib/utils";
 
 const ESTADOS: Record<EstadoTransporte, string> = {
   nuevo: "Nuevo",
@@ -101,6 +107,8 @@ function Datos({
     minimo: String(Number(t.minimo)),
     espera_hora: String(Number(t.espera_hora)),
     iva_incluido: t.iva_incluido,
+    sena_pct: String(t.sena_pct),
+    datos_transferencia: t.datos_transferencia ?? "",
   });
   const { run, message, error, saving, setError } = useGuardar(
     `/admin/transporte/${t.slug}`,
@@ -126,6 +134,11 @@ function Datos({
       );
       return;
     }
+    const sena = Number(d.sena_pct);
+    if (!Number.isInteger(sena) || sena < 0 || sena > 100) {
+      setError("La seña va en %, de 0 a 100.");
+      return;
+    }
     void run(
       "PUT",
       "",
@@ -134,6 +147,8 @@ function Datos({
         descripcion: d.descripcion.trim() || null,
         minimo: String(minimo),
         espera_hora: String(espera),
+        sena_pct: sena,
+        datos_transferencia: d.datos_transferencia.trim() || null,
       },
       "Guardamos los datos y las tarifas.",
     );
@@ -150,14 +165,15 @@ function Datos({
         Datos y tarifas
       </h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        <TextField
-          id="t-nombre"
-          label="Nombre"
-          value={d.nombre}
-          onChange={set("nombre")}
-          disabled={saving}
-          className="sm:col-span-2"
-        />
+        <div className="sm:col-span-2">
+          <TextField
+            id="t-nombre"
+            label="Nombre"
+            value={d.nombre}
+            onChange={set("nombre")}
+            disabled={saving}
+          />
+        </div>
         <TextField
           id="t-whatsapp"
           label="WhatsApp para pedidos"
@@ -190,6 +206,27 @@ function Datos({
           inputMode="decimal"
           value={d.espera_hora}
           onChange={set("espera_hora")}
+          disabled={saving}
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
+        <TextField
+          id="t-sena"
+          label="Seña de paquetes (%)"
+          type="number"
+          inputMode="numeric"
+          value={d.sena_pct}
+          onChange={set("sena_pct")}
+          disabled={saving}
+        />
+        <TextAreaField
+          id="t-transferencia"
+          label="Datos para transferir la seña"
+          hint="Alias, CBU y titular: se los mostramos al cliente al reservar."
+          rows={2}
+          maxLength={500}
+          value={d.datos_transferencia}
+          onChange={set("datos_transferencia")}
           disabled={saving}
         />
       </div>
@@ -634,10 +671,20 @@ function Encargados({ slug }: { slug: string }) {
   );
 }
 
-/** Panel del transportista: tarifas, unidades, portada y pedidos. */
+type Tab = "reservas" | "consultas" | "paquetes" | "traslados" | "datos";
+const TABS: [Tab, string][] = [
+  ["reservas", "Reservas"],
+  ["consultas", "Consultas"],
+  ["paquetes", "Paquetes"],
+  ["traslados", "Traslados"],
+  ["datos", "Datos y tarifas"],
+];
+
+/** Panel de la empresa: reservas, consultas, paquetes, traslados y datos. */
 export function TransporteAdminPanel({ slug }: { slug: string }) {
   const { user } = useAuth();
   const [t, setT] = React.useState<TransportistaAdmin | null>(null);
+  const [tab, setTab] = React.useState<Tab>("reservas");
   const [error, setError] = React.useState<string | null>(null);
   React.useEffect(() => {
     api<TransportistaAdmin>(`/admin/transporte/${slug}`)
@@ -654,7 +701,7 @@ export function TransporteAdminPanel({ slug }: { slug: string }) {
         <Button asChild variant="outline" size="sm">
           <Link href={`/transporte/${t.slug}`}>
             <ExternalLink aria-hidden="true" />
-            Ver el cotizador
+            Ver la página
           </Link>
         </Button>
       </div>
@@ -674,37 +721,69 @@ export function TransporteAdminPanel({ slug }: { slug: string }) {
           </span>
         </p>
       ) : null}
-      <Datos
-        key={`${t.minimo}-${t.espera_hora}-${t.iva_incluido}`}
-        t={t}
-        onSaved={setT}
-      />
-      <section aria-labelledby="portada-titulo" className={seccion}>
-        <h2 id="portada-titulo" className={h2}>
-          Foto de portada
-        </h2>
-        {t.foto_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- foto del bucket
-          <img
-            src={t.foto_url}
-            alt="Portada actual"
-            className="aspect-[16/6] w-full rounded-input object-cover"
+      <nav
+        aria-label="Secciones del panel"
+        className="-mx-4 flex gap-2 overflow-x-auto px-4"
+      >
+        {TABS.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={tab === id}
+            onClick={() => setTab(id)}
+            className={cn(
+              "inline-flex min-h-11 shrink-0 items-center rounded-pill border px-4 font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              tab === id
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card hover:border-primary",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {tab === "paquetes" ? <PaquetesAdmin slug={t.slug} /> : null}
+      {tab === "reservas" ? <ReservasAdmin slug={t.slug} /> : null}
+      {tab === "consultas" ? <ConsultasAdmin slug={t.slug} /> : null}
+      {tab === "datos" ? (
+        <>
+          <Datos
+            key={`${t.minimo}-${t.espera_hora}-${t.iva_incluido}-${t.sena_pct}`}
+            t={t}
+            onSaved={setT}
           />
-        ) : (
-          <p className="text-muted-foreground">
-            Sin foto: se ve el fondo azul.
-          </p>
-        )}
-        <SubirFoto
-          id="portada"
-          label={t.foto_url ? "Cambiar foto" : "Subir foto"}
-          path={`/admin/transporte/${t.slug}/foto`}
-          onSaved={setT}
-        />
-      </section>
-      <Unidades t={t} onSaved={setT} />
-      <Pedidos slug={t.slug} />
-      {user?.role === "admin" ? <Encargados slug={t.slug} /> : null}
+          <section aria-labelledby="portada-titulo" className={seccion}>
+            <h2 id="portada-titulo" className={h2}>
+              Foto de portada
+            </h2>
+            {t.foto_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- foto del bucket
+              <img
+                src={t.foto_url}
+                alt="Portada actual"
+                className="aspect-[16/6] w-full rounded-input object-cover"
+              />
+            ) : (
+              <p className="text-muted-foreground">
+                Sin foto: se ve el fondo azul.
+              </p>
+            )}
+            <SubirFoto
+              id="portada"
+              label={t.foto_url ? "Cambiar foto" : "Subir foto"}
+              path={`/admin/transporte/${t.slug}/foto`}
+              onSaved={setT}
+            />
+          </section>
+          {user?.role === "admin" ? <Encargados slug={t.slug} /> : null}
+        </>
+      ) : null}
+      {tab === "traslados" ? (
+        <>
+          <Pedidos slug={t.slug} />
+          <Unidades t={t} onSaved={setT} />
+        </>
+      ) : null}
     </div>
   );
 }

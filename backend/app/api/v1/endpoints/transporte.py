@@ -7,15 +7,23 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from app.api.deps import DbSession
 from app.core import ratelimit
 from app.schemas.transporte import (
+    ConsultaCreadaOut,
+    ConsultaIn,
     CotizacionOut,
     LugarOut,
     OpcionOut,
+    PaqueteOut,
+    PaqueteResumenOut,
     PedidoCreadoOut,
     PedidoTransporteIn,
+    ReservaCreadaOut,
+    ReservaIn,
+    SalidaOut,
     TransportistaOut,
     UnidadOut,
     ViajeIn,
 )
+from app.services import paquetes
 from app.services import transporte as service
 
 router = APIRouter(prefix="/transporte", tags=["transporte"])
@@ -50,6 +58,7 @@ def transportista(slug: str, db: DbSession) -> TransportistaOut:
         descripcion=found.descripcion,
         foto_url=found.foto_url,
         iva_incluido=found.iva_incluido,
+        whatsapp_url=paquetes.whatsapp_agencia(found),
         unidades=[UnidadOut.model_validate(u) for u in service.unidades_activas(found)],
     )
 
@@ -104,3 +113,87 @@ def crear_pedido(
         total=pedido.total,
         whatsapp_url=service.whatsapp_url(pedido),
     )
+
+
+# --- Paquetes -----------------------------------------------------------------
+
+
+@router.get("/{slug}/paquetes", response_model=list[PaqueteResumenOut])
+def listar_paquetes(slug: str, db: DbSession) -> list[PaqueteResumenOut]:
+    found = service.get_transportista(db, slug)
+    return [
+        PaqueteResumenOut.model_validate(p) for p in paquetes.list_paquetes(db, found)
+    ]
+
+
+@router.get("/{slug}/paquetes/{paquete_slug}", response_model=PaqueteOut)
+def ver_paquete(slug: str, paquete_slug: str, db: DbSession) -> PaqueteOut:
+    found = service.get_transportista(db, slug)
+    paquete = paquetes.get_paquete(db, found, paquete_slug)
+    paquetes.liberar_vencidas_paquete(db, paquete)
+    db.refresh(paquete)
+    return PaqueteOut(
+        **PaqueteResumenOut.model_validate(paquete).model_dump(),
+        descripcion=paquete.descripcion,
+        incluye=paquete.incluye,
+        salidas=[
+            SalidaOut.model_validate(s) for s in paquetes.salidas_visibles(paquete)
+        ],
+        sena_pct=found.sena_pct,
+        whatsapp_url=paquetes.whatsapp_paquete(paquete),
+    )
+
+
+@router.post(
+    "/{slug}/paquetes/{paquete_slug}/reservas",
+    response_model=ReservaCreadaOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def reservar(
+    slug: str, paquete_slug: str, body: ReservaIn, request: Request, db: DbSession
+) -> ReservaCreadaOut:
+    ratelimit.enforce(
+        f"rl:paquetes:reserva:{ratelimit.client_ip(request)}",
+        8,
+        3600,
+        "Ya hiciste varias reservas. Si necesitás otra, escribinos por WhatsApp.",
+    )
+    # Además del límite por IP, uno por email: no se puede usar para mandarle
+    # mails de reserva a una misma persona una y otra vez.
+    ratelimit.enforce(
+        f"rl:paquetes:reserva:email:{body.email.lower()}",
+        3,
+        86400,
+        "Ya hay reservas con ese email. Si necesitás otra, escribinos por WhatsApp.",
+    )
+    found = service.get_transportista(db, slug)
+    paquete = paquetes.get_paquete(db, found, paquete_slug)
+    reserva = paquetes.reservar(db, found, paquete, body)
+    paquetes.notificar_reserva(reserva)
+    return ReservaCreadaOut(
+        codigo=reserva.codigo,
+        total=reserva.total,
+        sena=reserva.sena,
+        sena_pct=found.sena_pct,
+        datos_transferencia=found.datos_transferencia,
+        whatsapp_url=paquetes.whatsapp_reserva(reserva),
+    )
+
+
+@router.post(
+    "/{slug}/consultas",
+    response_model=ConsultaCreadaOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def consultar(
+    slug: str, body: ConsultaIn, request: Request, db: DbSession
+) -> ConsultaCreadaOut:
+    ratelimit.enforce(
+        f"rl:paquetes:consulta:{ratelimit.client_ip(request)}",
+        10,
+        3600,
+        "Ya nos dejaste varias consultas. Te respondemos a la brevedad.",
+    )
+    found = service.get_transportista(db, slug)
+    _, url = paquetes.consultar(db, found, body)
+    return ConsultaCreadaOut(whatsapp_url=url)
