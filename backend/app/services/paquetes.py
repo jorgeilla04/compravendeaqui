@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import html
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from urllib.parse import quote
 
@@ -22,6 +22,9 @@ from app.services import mailer
 from app.services.tiendas import formato_pesos, slugify
 
 log = get_logger(__name__)
+
+# Una reserva sin seña aparta los lugares 72 h; después se cancela sola.
+VENCE_SIN_SENA = timedelta(hours=72)
 
 ESTADO_RESERVA = {
     "pendiente_sena": "Pendiente de seña",
@@ -59,6 +62,34 @@ def get_paquete(
     if paquete is None or (not paquete.activo and not include_inactive):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Ese paquete no existe")
     return paquete
+
+
+def liberar_vencidas(db: Session, salida: Salida) -> None:
+    """Cancela las reservas sin seña vencidas de la salida (con la salida ya
+    bloqueada) y devuelve sus lugares."""
+    limite = datetime.now(UTC) - VENCE_SIN_SENA
+    vencidas = db.scalars(
+        select(Reserva)
+        .where(
+            Reserva.salida_id == salida.id,
+            Reserva.estado == "pendiente_sena",
+            Reserva.created_at < limite,
+        )
+        .with_for_update()
+    ).all()
+    for reserva in vencidas:
+        reserva.estado = "cancelada"
+        reserva.notas = ((reserva.notas or "") + "\n[Vencida sin seña]").strip()
+        salida.reservados = max(0, salida.reservados - reserva.pasajeros)
+
+
+def liberar_vencidas_paquete(db: Session, paquete: Paquete) -> None:
+    for salida in paquete.salidas:
+        locked = db.scalars(
+            select(Salida).where(Salida.id == salida.id).with_for_update()
+        ).one()
+        liberar_vencidas(db, locked)
+    db.commit()
 
 
 def salidas_visibles(paquete: Paquete) -> list[Salida]:
@@ -119,6 +150,7 @@ def reservar(
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, detail="Esa salida ya no está disponible"
         )
+    liberar_vencidas(db, salida)
     if salida.disponibles < body.pasajeros:
         db.rollback()
         detail = (
@@ -157,12 +189,16 @@ def reservar(
 
 
 def cambiar_estado(db: Session, reserva: Reserva, estado: str) -> None:
-    """Cancelar libera los lugares; reactivar los vuelve a tomar si quedan."""
-    if estado == reserva.estado:
-        return
+    """Cancelar libera los lugares; reactivar los vuelve a tomar si quedan.
+    Salida y reserva se bloquean juntas: dos cambios a la vez no descuadran
+    el contador."""
     salida = db.scalars(
         select(Salida).where(Salida.id == reserva.salida_id).with_for_update()
     ).one()
+    db.refresh(reserva, with_for_update=True)
+    if estado == reserva.estado:
+        db.rollback()
+        return
     if estado == "cancelada":
         salida.reservados = max(0, salida.reservados - reserva.pasajeros)
     elif reserva.estado == "cancelada":
@@ -205,9 +241,13 @@ def _resumen_reserva(reserva: Reserva) -> str:
     return "\n".join(lineas)
 
 
-def _send(to: str, asunto: str, texto: str, reply_to: str | None = None) -> None:
+def _send(
+    to: str, asunto: str, texto: str, ref: str, reply_to: str | None = None
+) -> None:
+    """ref: código de reserva o id de consulta (los logs no llevan datos
+    personales)."""
     if not settings.email_configured:
-        log.warning("paquetes.mail_sin_configurar", asunto=asunto)
+        log.warning("paquetes.mail_sin_configurar", ref=ref)
         return
     msg = mailer.new_message(to, asunto)
     if reply_to:
@@ -221,17 +261,19 @@ def _send(to: str, asunto: str, texto: str, reply_to: str | None = None) -> None
     try:
         mailer.send(msg)
     except mailer.MailError as exc:
-        log.error("paquetes.mail_fallido", asunto=asunto, error=str(exc))
+        log.error("paquetes.mail_fallido", ref=ref, error=str(exc))
 
 
 def notificar_reserva(reserva: Reserva) -> None:
-    """A la agencia, con el detalle; al cliente, con cómo pagar la seña."""
+    """A la agencia, con todo el detalle; al cliente, solo datos del sistema
+    (paquete, salida, importes y cómo pagar), sin el texto libre que cargó
+    quien reservó: el mail no sirve para mandarle cualquier cosa a terceros."""
     t = reserva.transportista
-    resumen = _resumen_reserva(reserva)
     _send(
         t.email,
         f"Nueva reserva {reserva.codigo} — {reserva.paquete_titulo}",
-        resumen,
+        _resumen_reserva(reserva),
+        ref=reserva.codigo,
         reply_to=reserva.email,
     )
     pago = (
@@ -240,13 +282,21 @@ def notificar_reserva(reserva: Reserva) -> None:
         if t.datos_transferencia
         else "Te escribimos para coordinar el pago de la seña.\n\n"
     )
+    horas = int(VENCE_SIN_SENA.total_seconds() // 3600)
     _send(
         reserva.email,
         f"Tu reserva {reserva.codigo} — {reserva.paquete_titulo}",
-        f"Hola {reserva.nombre.split()[0]}, recibimos tu reserva. Los lugares "
-        f"quedan apartados mientras se acredita la seña.\n\n{pago}"
+        f"Recibimos tu reserva {reserva.codigo}.\n\n"
+        f"Paquete: {reserva.paquete_titulo}\n"
+        f"Salida: {reserva.salida_nombre}\n"
+        f"Pasajeros: {reserva.pasajeros}\n"
+        f"Total: {formato_pesos(reserva.total)}\n"
+        f"Seña ({t.sena_pct}%): {formato_pesos(reserva.sena)}\n\n"
+        f"Los lugares quedan apartados {horas} horas mientras se acredita la "
+        f"seña.\n\n{pago}"
         f"Mandanos el comprobante por WhatsApp: {whatsapp_reserva(reserva)}\n\n"
-        f"{resumen}\n\n{t.nombre}",
+        f"{t.nombre}",
+        ref=reserva.codigo,
         reply_to=t.email,
     )
 
@@ -288,6 +338,7 @@ def consultar(
                 f"Responder por WhatsApp: https://wa.me/{wa_digits(consulta.telefono)}",
             ]
         ),
+        ref=str(consulta.id),
         reply_to=consulta.email,
     )
     url = whatsapp_paquete(paquete) if paquete else whatsapp_agencia(transportista)

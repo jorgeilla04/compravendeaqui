@@ -109,7 +109,7 @@ export function ReservarPaquete({
         ref={okRef}
         tabIndex={-1}
         aria-labelledby="reserva-ok"
-        className="flex scroll-mt-36 flex-col gap-3 rounded-card focus:outline-none border border-border bg-card p-5"
+        className="flex scroll-mt-36 flex-col gap-3 rounded-card border border-border bg-card p-5 focus:outline-none"
       >
         <span className="flex size-12 items-center justify-center rounded-pill bg-success text-white">
           <Check aria-hidden="true" className="size-6" />
@@ -118,8 +118,8 @@ export function ReservarPaquete({
           Reservaste: {reserva.codigo}
         </h2>
         <p>
-          Total {pesosLabel(reserva.total)}. Tus lugares quedan apartados: para
-          confirmarlos, pagá la seña de{" "}
+          Total {pesosLabel(reserva.total)}. Tus lugares quedan apartados 72
+          horas: para confirmarlos, pagá la seña de{" "}
           <strong>{pesosLabel(reserva.sena)}</strong> ({reserva.sena_pct}%).
         </p>
         {reserva.datos_transferencia ? (

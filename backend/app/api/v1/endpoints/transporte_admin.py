@@ -298,8 +298,13 @@ def _paquete(db: DbSession, found: Transportista, paquete_slug: str) -> Paquete:
     return paquetes.get_paquete(db, found, paquete_slug, include_inactive=True)
 
 
-def _salida(paquete: Paquete, salida_id: uuid.UUID) -> Salida:
-    salida = next((s for s in paquete.salidas if s.id == salida_id), None)
+def _salida(db: DbSession, paquete: Paquete, salida_id: uuid.UUID) -> Salida:
+    """La salida bloqueada (el mismo lock que toman las reservas)."""
+    salida = db.scalars(
+        select(Salida)
+        .where(Salida.id == salida_id, Salida.paquete_id == paquete.id)
+        .with_for_update()
+    ).first()
     if salida is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Esa salida no existe")
     return salida
@@ -422,7 +427,7 @@ def editar_salida(
     db: DbSession,
 ) -> PaqueteAdminOut:
     paquete = _paquete(db, _transportista(db, user, slug), paquete_slug)
-    salida = _salida(paquete, salida_id)
+    salida = _salida(db, paquete, salida_id)
     if body.cupos < salida.reservados:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -447,13 +452,13 @@ def borrar_salida(
     db: DbSession,
 ) -> PaqueteAdminOut:
     paquete = _paquete(db, _transportista(db, user, slug), paquete_slug)
-    salida = _salida(paquete, salida_id)
+    salida = _salida(db, paquete, salida_id)
     if salida.reservados:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             detail="Tiene reservas: desactivala en vez de borrarla",
         )
-    paquete.salidas.remove(salida)
+    db.delete(salida)
     db.commit()
     return _paquete_out(db, paquete)
 

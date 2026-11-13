@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import update
 
 from app.config import settings
-from app.models import User
+from app.models import Reserva, User
 from app.scripts.importar_paquetes import main as importar
 from app.services import mailer
 from app.tests.conftest import jpeg_bytes
@@ -205,3 +206,31 @@ def test_importar_paquetes(tmp_path: Path, client: TestClient) -> None:
     data = client.get(f"{API}/paquetes/mar-del-plata-preventa-verano-2027").json()
     assert data["foto_url"].endswith(".webp")
     assert len(data["salidas"]) == 1  # no se duplican al reimportar
+
+
+def test_reserva_sin_sena_vence(
+    client: TestClient,
+    admin: TestClient,
+    paquete: dict[str, Any],
+    db: Any,
+    mails: list[EmailMessage],
+) -> None:
+    salida_id = paquete["salidas"][0]["id"]
+    url = f"{API}/paquetes/{paquete['slug']}"
+    r = client.post(
+        f"{url}/reservas", json={**CLIENTE, "salida_id": salida_id, "pasajeros": 4}
+    )
+    assert r.status_code == 201, r.text
+    # El mail al cliente no lleva lo que escribió quien reservó.
+    cliente = mails[1]
+    assert "30111222" not in _cuerpo(cliente)
+    assert client.get(url).json()["salidas"][0]["disponibles"] == 1
+
+    db.execute(
+        update(Reserva).values(created_at=datetime.now(UTC) - timedelta(hours=73))
+    )
+    db.commit()
+    assert client.get(url).json()["salidas"][0]["disponibles"] == 5
+    (reserva,) = admin.get(f"{ADMIN}/reservas").json()
+    assert reserva["estado"] == "cancelada"
+    assert "Vencida sin seña" in reserva["notas"]

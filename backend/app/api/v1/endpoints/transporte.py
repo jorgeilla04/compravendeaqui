@@ -130,6 +130,8 @@ def listar_paquetes(slug: str, db: DbSession) -> list[PaqueteResumenOut]:
 def ver_paquete(slug: str, paquete_slug: str, db: DbSession) -> PaqueteOut:
     found = service.get_transportista(db, slug)
     paquete = paquetes.get_paquete(db, found, paquete_slug)
+    paquetes.liberar_vencidas_paquete(db, paquete)
+    db.refresh(paquete)
     return PaqueteOut(
         **PaqueteResumenOut.model_validate(paquete).model_dump(),
         descripcion=paquete.descripcion,
@@ -155,6 +157,14 @@ def reservar(
         8,
         3600,
         "Ya hiciste varias reservas. Si necesitás otra, escribinos por WhatsApp.",
+    )
+    # Además del límite por IP, uno por email: no se puede usar para mandarle
+    # mails de reserva a una misma persona una y otra vez.
+    ratelimit.enforce(
+        f"rl:paquetes:reserva:email:{body.email.lower()}",
+        3,
+        86400,
+        "Ya hay reservas con ese email. Si necesitás otra, escribinos por WhatsApp.",
     )
     found = service.get_transportista(db, slug)
     paquete = paquetes.get_paquete(db, found, paquete_slug)
