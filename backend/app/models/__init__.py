@@ -14,6 +14,12 @@ from app.models.tiendas import (
     Tienda,
     TiendaAdmin,
 )
+from app.models.transporte import (
+    TransporteAdmin,
+    TransportePedido,
+    TransporteUnidad,
+    Transportista,
+)
 from app.models.user import User
 
 __all__ = [
@@ -31,5 +37,9 @@ __all__ = [
     "RefreshToken",
     "Tienda",
     "TiendaAdmin",
+    "TransporteAdmin",
+    "TransportePedido",
+    "Transportista",
+    "TransporteUnidad",
     "User",
 ]

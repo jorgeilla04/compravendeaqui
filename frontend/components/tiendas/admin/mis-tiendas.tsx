@@ -113,37 +113,54 @@ function NuevaTienda() {
 export function MisTiendas() {
   const { user } = useAuth();
   const [tiendas, setTiendas] = React.useState<TiendaResumen[] | null>(null);
+  const [transportes, setTransportes] = React.useState<TiendaResumen[]>([]);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     api<TiendaResumen[]>("/admin/tiendas")
       .then(setTiendas)
       .catch((err) => setError(errorMessage(err)));
+    // Cotizadores de transporte que administra (mismo acceso que las tiendas).
+    api<TiendaResumen[]>("/admin/transporte")
+      .then(setTransportes)
+      .catch(() => undefined);
   }, []);
+  const items = [
+    ...(tiendas ?? []).map((t) => ({
+      ...t,
+      href: `/tiendas/${t.slug}/admin`,
+      detalle: "Pedidos, catálogo, envío y pagos",
+    })),
+    ...transportes.map((t) => ({
+      ...t,
+      href: `/transporte/${t.slug}/admin`,
+      detalle: "Cotizador: tarifas, unidades y pedidos",
+    })),
+  ];
 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-heading text-h1 font-semibold">Mis tiendas</h1>
       {error ? <FormMessage>{error}</FormMessage> : null}
       {tiendas === null && !error ? <Skeleton className="h-24 w-full" /> : null}
-      {tiendas?.length === 0 ? (
+      {tiendas !== null && items.length === 0 ? (
         <p className="text-muted-foreground">
           No administrás ninguna tienda. Si querés vender por acá, escribinos al
           contacto que figura en Términos.
         </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
-          {tiendas?.map((t) => (
-            <li key={t.slug}>
+          {items.map((t) => (
+            <li key={t.href}>
               <Link
-                href={`/tiendas/${t.slug}/admin`}
+                href={t.href}
                 className="flex flex-col gap-1 rounded-card border border-border bg-card p-4 transition-colors duration-200 hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="font-heading text-h3 font-semibold">
                   {t.nombre}
                 </span>
                 <span className="text-meta text-muted-foreground">
-                  Pedidos, catálogo, envío y pagos
+                  {t.detalle}
                 </span>
               </Link>
             </li>

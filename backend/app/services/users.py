@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, object_session
 from app.core import ratelimit
 from app.core.logging import get_logger
 from app.core.phone import mask_phone
-from app.models import Listing, User
+from app.models import Listing, TransporteAdmin, User
 from app.models.tiendas import TiendaAdmin
 from app.schemas.user import MeOut, UserUpdateIn
 from app.services import images as image_service
@@ -30,12 +30,16 @@ def _gestiona_tiendas(user: User) -> bool:
     db = object_session(user)
     if db is None:
         return False
-    return (
-        db.scalars(
-            select(TiendaAdmin.tienda_id).where(TiendaAdmin.user_id == user.id).limit(1)
-        ).first()
-        is not None
-    )
+    tienda = db.scalars(
+        select(TiendaAdmin.tienda_id).where(TiendaAdmin.user_id == user.id).limit(1)
+    ).first()
+    # Los encargados del cotizador de transporte usan el mismo acceso.
+    transporte = db.scalars(
+        select(TransporteAdmin.transportista_id)
+        .where(TransporteAdmin.user_id == user.id)
+        .limit(1)
+    ).first()
+    return tienda is not None or transporte is not None
 
 
 def to_me(user: User) -> MeOut:
