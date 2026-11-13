@@ -253,8 +253,15 @@ def test_limite_por_email_solo_cuenta_reservas_hechas(
     salida_id = paquete["salidas"][0]["id"]
     url = f"{API}/paquetes/{paquete['slug']}/reservas"
     # Intentos fallidos (sin lugar) no consumen el cupo del email.
-    for _ in range(6):
+    for _ in range(4):
         r = client.post(url, json={**CLIENTE, "salida_id": salida_id, "pasajeros": 9})
         assert r.status_code == 409
     r = client.post(url, json={**CLIENTE, "salida_id": salida_id, "pasajeros": 1})
     assert r.status_code == 201, r.text
+    # Con 3 reservas hechas, el email ya no recibe más (aunque quede lugar).
+    for _ in range(2):
+        r = client.post(url, json={**CLIENTE, "salida_id": salida_id, "pasajeros": 1})
+        assert r.status_code == 201, r.text
+    r = client.post(url, json={**CLIENTE, "salida_id": salida_id, "pasajeros": 1})
+    assert r.status_code == 429
+    assert "No pudimos tomar la reserva" in r.json()["detail"]
