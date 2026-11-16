@@ -165,6 +165,47 @@ class ProductoPrecio:
     precio: Decimal
     foto_url: str | None
 
+    @property
+    def precios_talle(self) -> dict[str, Decimal | None]:
+        """Talles con precio propio (None = consultar)."""
+        return precios_talle(self.producto)
+
+    def precio_de(self, opcion: str | None) -> Decimal | None:
+        """Precio de esa opción: el de su tramo o el del grupo/base. None:
+        se consulta (no se puede comprar en línea)."""
+        propios = self.precios_talle
+        if opcion is not None and opcion in propios:
+            return propios[opcion]
+        return self.precio
+
+    @property
+    def precio_desde(self) -> Decimal | None:
+        """El precio más económico que se puede comprar, para publicar."""
+        opciones: list[str | None] = list(self.producto.opciones) or [None]
+        precios = [p for o in opciones if (p := self.precio_de(o)) is not None]
+        return min(precios) if precios else None
+
+
+def precios_talle(producto: Producto) -> dict[str, Decimal | None]:
+    """Precio de cada talle que está en un tramo (solo talles vigentes)."""
+    out: dict[str, Decimal | None] = {}
+    for tramo in producto.tramos or []:
+        precio = tramo.get("precio")
+        for talle in tramo.get("talles", []):
+            if talle in producto.opciones:
+                out[talle] = Decimal(str(precio)) if precio is not None else None
+    return out
+
+
+def guardar_tramos(producto: Producto, tramos: list[dict[str, Any]]) -> None:
+    """Guarda los tramos solo con talles que la prenda tiene (sin vacíos)."""
+    limpios = []
+    for tramo in tramos:
+        talles = [t for t in tramo["talles"] if t in producto.opciones]
+        if talles:
+            limpios.append({**tramo, "talles": talles})
+    producto.tramos = limpios
+
 
 def list_grupos(
     db: Session, tienda: Tienda, *, include_inactive: bool = False
@@ -519,7 +560,16 @@ def crear_pedido(
                     else f"{pp.producto.nombre} no tiene {tienda.opcion_label.lower()}"
                 ),
             )
-        subtotal += pp.precio * item.cantidad
+        precio = pp.precio_de(item.opcion if opciones else None)
+        if precio is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"{pp.producto.nombre} {tienda.opcion_label.lower()} "
+                    f"{item.opcion} se consulta por WhatsApp"
+                ),
+            )
+        subtotal += precio * item.cantidad
         lineas.append(
             PedidoItem(
                 grupo_id=grupo.id,
@@ -528,7 +578,7 @@ def crear_pedido(
                 producto_nombre=pp.producto.nombre,
                 opcion=item.opcion if opciones else None,
                 cantidad=item.cantidad,
-                precio_unit=pp.precio,
+                precio_unit=precio,
             )
         )
 

@@ -1258,3 +1258,78 @@ def test_buscar_tiendas_y_colegios(client: TestClient, colegio: dict[str, Any]) 
 
     assert buscar("heladera") == []
     assert buscar("") == []
+
+
+def test_precios_por_talle(
+    admin: TestClient, client: TestClient, colegio: dict[str, Any]
+) -> None:
+    tramos = [
+        {
+            "talles": ["4", "6", "8", "10", "12", "14", "16"],
+            "precio": "15000",
+            "costo": "9000",
+        },
+        {"talles": ["S", "M", "L", "XL"], "precio": "18000", "costo": "11000"},
+        {"talles": ["XXL", "3XL", "5XL"], "precio": None},
+    ]
+    url = f"{ADMIN}/uniformes/productos/remera"
+    r = admin.put(
+        url,
+        json={
+            "opciones": TALLES_5XL,
+            "tramos": tramos,
+            "costo": "6000",
+        },
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["costo"] == "6000.00"
+    assert data["tramos"][2]["talles"] == ["XXL", "3XL", "5XL"]
+
+    # Un talle en dos precios no se guarda.
+    doble = [{"talles": ["4"], "precio": "1"}, {"talles": ["4", "6"], "precio": "2"}]
+    assert admin.put(url, json={"tramos": doble}).status_code == 422
+
+    # La tienda publica el más económico y el precio de cada talle, sin costos.
+    grupo = client.get(f"{API}/uniformes/grupos/{colegio['slug']}").json()
+    remera = next(p for p in grupo["productos"] if p["slug"] == "remera")
+    # 4XL no tiene tramo y vale el precio base (10000): es el más económico.
+    assert float(remera["precio_desde"]) == 10000
+    assert float(remera["precios_talle"]["M"]) == 18000
+    assert remera["precios_talle"]["XXL"] is None
+    # El talle 4XL no está en ningún tramo: vale el precio base.
+    assert "4XL" not in remera["precios_talle"]
+    assert "costo" not in json.dumps(remera)
+
+    # El pedido cobra el precio del talle; un talle "consultar" no se compra.
+    body = pedido_body(colegio["slug"])
+    body["items"] = [
+        {"grupo": colegio["slug"], "producto": "remera", "opcion": "10", "cantidad": 1},
+        {"grupo": colegio["slug"], "producto": "remera", "opcion": "L", "cantidad": 1},
+        {
+            "grupo": colegio["slug"],
+            "producto": "remera",
+            "opcion": "4XL",
+            "cantidad": 1,
+        },
+    ]
+    r = client.post(f"{API}/uniformes/pedidos", json=body)
+    assert r.status_code == 201, r.text
+    precios = [float(i["precio_unit"]) for i in r.json()["pedido"]["items"]]
+    assert precios == [15000, 18000, 10000]
+    body["items"] = [
+        {"grupo": colegio["slug"], "producto": "remera", "opcion": "XXL", "cantidad": 1}
+    ]
+    r = client.post(f"{API}/uniformes/pedidos", json=body)
+    assert r.status_code == 422
+    assert "se consulta" in r.json()["detail"]
+
+    # Si se sacan talles, los tramos se quedan con los que siguen.
+    r = admin.put(url, json={"opciones": ["4", "6", "S", "XXL"]})
+    assert [t["talles"] for t in r.json()["tramos"]] == [["4", "6"], ["S"], ["XXL"]]
+
+
+TALLES_5XL = [
+    "4", "6", "8", "10", "12", "14", "16",
+    "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL",
+]  # fmt: skip

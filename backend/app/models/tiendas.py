@@ -130,6 +130,14 @@ class Producto(UUIDPrimaryKeyMixin, Base):
     # Guía de talles: {"columnas": [...], "filas": [{"talle", "valores"}],
     # "aproximadas": bool}. Medidas de la prenda en cm.
     medidas: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # Precios por talle: [{"talles": [...], "precio": "15000" | None,
+    # "costo": "9000" | None}]. precio None = "consultar". Los talles que no
+    # están en ningún tramo usan el precio base (o el del grupo).
+    tramos: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list, server_default="[]"
+    )
+    # Costo del precio base: solo lo ve quien administra (referencia de margen).
+    costo: Mapped[Decimal | None] = mapped_column(MONEY)
     orden: Mapped[int] = mapped_column(Integer, default=0)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
 

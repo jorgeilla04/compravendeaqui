@@ -170,6 +170,10 @@ class ProductoOut(BaseModel):
     opciones: list[str]
     foto_url: str | None
     medidas: Medidas | None = None
+    # Precio de cada talle con precio propio (None = consultar); los demás
+    # talles valen "precio". precio_desde: el más económico, para publicar.
+    precios_talle: dict[str, Monto | None] = Field(default_factory=dict)
+    precio_desde: Monto | None = None
 
 
 class GrupoDetalleOut(GrupoOut):
@@ -387,6 +391,33 @@ class GrupoAdminOut(GrupoOut):
     fotos: list[str]
 
 
+class Tramo(BaseModel):
+    """Precio de un grupo de talles. precio None = se consulta por WhatsApp."""
+
+    talles: list[str] = Field(min_length=1, max_length=40)
+    precio: Monto | None = Field(default=None, ge=0, le=100_000_000)
+    costo: Monto | None = Field(default=None, ge=0, le=100_000_000)
+
+    @field_validator("talles")
+    @classmethod
+    def _talles(cls, value: list[str]) -> list[str]:
+        return _clean_opciones(value)
+
+
+def _tramos_validos(value: list[Tramo] | None) -> list[Tramo] | None:
+    if value is None:
+        return None
+    vistos: set[str] = set()
+    for tramo in value:
+        repetidos = vistos.intersection(tramo.talles)
+        if repetidos:
+            raise ValueError(
+                f"El talle {sorted(repetidos)[0]} está en dos precios distintos"
+            )
+        vistos.update(tramo.talles)
+    return value
+
+
 class ProductoIn(BaseModel):
     nombre: str = Field(min_length=2, max_length=120)
     descripcion: str | None = Field(default=None, max_length=1000)
@@ -410,11 +441,18 @@ class ProductoUpdateIn(BaseModel):
     orden: int | None = Field(default=None, ge=0, le=1000)
     activo: bool | None = None
     medidas: Medidas | None = None
+    tramos: list[Tramo] | None = Field(default=None, max_length=10)
+    costo: Monto | None = Field(default=None, ge=0, le=100_000_000)
 
     @field_validator("opciones")
     @classmethod
     def _opciones(cls, value: list[str] | None) -> list[str] | None:
         return _clean_opciones(value) if value is not None else None
+
+    @field_validator("tramos")
+    @classmethod
+    def _tramos(cls, value: list[Tramo] | None) -> list[Tramo] | None:
+        return _tramos_validos(value)
 
 
 class ProductoAdminOut(BaseModel):
@@ -428,6 +466,8 @@ class ProductoAdminOut(BaseModel):
     opciones: list[str]
     foto_url: str | None
     medidas: Medidas | None = None
+    tramos: list[Tramo] = Field(default_factory=list)
+    costo: Monto | None = None
     orden: int
     activo: bool
 

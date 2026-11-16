@@ -103,7 +103,7 @@ def _clean_state() -> Iterator[None]:
         conn.execute(
             text(
                 "UPDATE tienda_productos SET precio_base = 10000, activo = true, "
-                "foto_url = NULL"
+                "tramos = '[]', costo = NULL, foto_url = NULL"
             )
         )
         conn.execute(text(RESET_UNIFORMES))
