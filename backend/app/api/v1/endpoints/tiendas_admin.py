@@ -389,10 +389,17 @@ def editar_producto(
 ) -> ProductoAdminOut:
     tienda = _tienda(db, user, slug)
     producto = service.get_producto(db, tienda, producto_slug)
-    for key, value in body.model_dump(exclude_unset=True).items():
-        # descripcion y medidas se pueden borrar mandando null.
-        if value is not None or key in ("descripcion", "medidas"):
+    datos = body.model_dump(exclude_unset=True, mode="json")
+    tramos = datos.pop("tramos", None)
+    for key, value in datos.items():
+        # descripcion, medidas y costo se pueden borrar mandando null.
+        if value is not None or key in ("descripcion", "medidas", "costo"):
             setattr(producto, key, value)
+    if tramos is not None:
+        service.guardar_tramos(producto, tramos)
+    elif "opciones" in datos:
+        # Si cambian los talles, los tramos se quedan solo con los vigentes.
+        service.guardar_tramos(producto, list(producto.tramos or []))
     db.commit()
     db.refresh(producto)
     return ProductoAdminOut.model_validate(producto)

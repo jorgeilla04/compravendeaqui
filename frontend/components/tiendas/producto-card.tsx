@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Minus, Plus } from "lucide-react";
+import { Check, MessageCircle, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -9,6 +9,7 @@ import { ProductoIlustracion } from "@/components/tiendas/producto-ilustracion";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/form";
 import { MAX_CANTIDAD, useCart } from "@/lib/tiendas/cart";
+import { precioDe } from "@/lib/tiendas/precios";
 import { pesosLabel } from "@/lib/tiendas/cotizar";
 import type { GrupoDetalle, Producto } from "@/lib/tiendas/types";
 
@@ -19,10 +20,12 @@ export function ProductoCard({
   grupo,
   producto,
   opcionLabel,
+  whatsappUrl,
 }: {
   grupo: GrupoDetalle;
   producto: Producto;
   opcionLabel: string;
+  whatsappUrl?: string;
 }) {
   const { add, tienda } = useCart();
   const tieneOpciones = producto.opciones.length > 0;
@@ -34,12 +37,28 @@ export function ProductoCard({
   const [added, setAdded] = React.useState<string | null>(null);
   const id = `producto-${producto.slug}`;
   const nombre = producto.nombre.toLowerCase();
+  // Precio del talle elegido; sin talle, el más económico ("desde").
+  const precio = precioDe(producto, opcion || null);
+  const consultar = Boolean(opcion) && precio === null;
+  const desde =
+    !opcion &&
+    producto.precio_desde != null &&
+    Object.keys(producto.precios_talle ?? {}).length > 0;
+  const precioMostrado = opcion
+    ? precio
+    : (producto.precio_desde ?? producto.precio);
+  const consultaUrl = whatsappUrl
+    ? `${whatsappUrl.split("?")[0]}?text=${encodeURIComponent(
+        `Hola, quiero consultar el precio de ${producto.nombre} ${opcionLabel.toLowerCase()} ${opcion} de ${grupo.nombre}.`,
+      )}`
+    : null;
 
   function handleAdd() {
     if (tieneOpciones && !opcion) {
       setError(`Elegí ${opcionLabel.toLowerCase()}.`);
       return;
     }
+    if (precio === null) return;
     setError(null);
     add({
       grupo: grupo.slug,
@@ -52,7 +71,7 @@ export function ProductoCard({
       fotoUrl: producto.foto_url,
       opcion: tieneOpciones ? opcion : null,
       cantidad,
-      precio: Number(producto.precio),
+      precio: Number(precio),
     });
     setAdded(
       `Agregaste ${cantidad} ${nombre}${
@@ -86,8 +105,16 @@ export function ProductoCard({
           <h2 id={`${id}-title`} className="font-heading text-h3 font-medium">
             {producto.nombre}
           </h2>
-          <span className="text-h3 font-semibold text-foreground">
-            {pesosLabel(producto.precio)}
+          <span
+            aria-live="polite"
+            className="shrink-0 text-right text-h3 font-semibold text-foreground"
+          >
+            {desde ? (
+              <span className="block text-meta font-normal text-muted-foreground">
+                Desde
+              </span>
+            ) : null}
+            {precioMostrado === null ? "Consultar" : pesosLabel(precioMostrado)}
           </span>
         </div>
         {producto.descripcion ? (
@@ -122,50 +149,70 @@ export function ProductoCard({
             seleccionado={opcion}
           />
         ) : null}
-        <div className="flex items-center gap-3">
-          <span id={`${id}-cantidad`} className="text-meta font-semibold">
-            Cantidad
-          </span>
-          <div
-            role="group"
-            aria-labelledby={`${id}-cantidad`}
-            className="flex items-center gap-2"
-          >
-            <button
-              type="button"
-              className={stepper}
-              onClick={() => setCantidad((c) => Math.max(1, c - 1))}
-              disabled={cantidad <= 1}
-              aria-label={`Una ${nombre} menos`}
+        {consultar ? null : (
+          <div className="flex items-center gap-3">
+            <span id={`${id}-cantidad`} className="text-meta font-semibold">
+              Cantidad
+            </span>
+            <div
+              role="group"
+              aria-labelledby={`${id}-cantidad`}
+              className="flex items-center gap-2"
             >
-              <Minus aria-hidden="true" className="size-4" />
-            </button>
-            <output
-              aria-live="polite"
-              className="min-w-8 text-center text-h3 font-semibold"
-            >
-              {cantidad}
-            </output>
-            <button
-              type="button"
-              className={stepper}
-              onClick={() => setCantidad((c) => Math.min(MAX_CANTIDAD, c + 1))}
-              disabled={cantidad >= MAX_CANTIDAD}
-              aria-label={`Una ${nombre} más`}
-            >
-              <Plus aria-hidden="true" className="size-4" />
-            </button>
+              <button
+                type="button"
+                className={stepper}
+                onClick={() => setCantidad((c) => Math.max(1, c - 1))}
+                disabled={cantidad <= 1}
+                aria-label={`Una ${nombre} menos`}
+              >
+                <Minus aria-hidden="true" className="size-4" />
+              </button>
+              <output
+                aria-live="polite"
+                className="min-w-8 text-center text-h3 font-semibold"
+              >
+                {cantidad}
+              </output>
+              <button
+                type="button"
+                className={stepper}
+                onClick={() =>
+                  setCantidad((c) => Math.min(MAX_CANTIDAD, c + 1))
+                }
+                disabled={cantidad >= MAX_CANTIDAD}
+                aria-label={`Una ${nombre} más`}
+              >
+                <Plus aria-hidden="true" className="size-4" />
+              </button>
+            </div>
           </div>
-        </div>
-        <Button
-          type="button"
-          variant="primary"
-          className="mt-auto w-full"
-          onClick={handleAdd}
-          aria-describedby={`${id}-title`}
-        >
-          Agregar al carrito
-        </Button>
+        )}
+        {consultar ? (
+          <>
+            <p className="text-meta text-muted-foreground">
+              El precio de este {opcionLabel.toLowerCase()} se consulta.
+            </p>
+            {consultaUrl ? (
+              <Button asChild variant="whatsapp" className="mt-auto w-full">
+                <a href={consultaUrl} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle aria-hidden="true" />
+                  Consultar por WhatsApp
+                </a>
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          <Button
+            type="button"
+            variant="primary"
+            className="mt-auto w-full"
+            onClick={handleAdd}
+            aria-describedby={`${id}-title`}
+          >
+            Agregar al carrito
+          </Button>
+        )}
         <p aria-live="polite" className="min-h-6 text-meta">
           {added ? (
             <span className="inline-flex flex-wrap items-center gap-1 font-semibold text-success">

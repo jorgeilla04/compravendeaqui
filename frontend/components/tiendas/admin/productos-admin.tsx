@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { GuiaTallesEditor } from "@/components/tiendas/admin/guia-talles-editor";
+import { PreciosTalleEditor } from "@/components/tiendas/admin/precios-talle-editor";
 import { Button } from "@/components/ui/button";
 import {
   FormMessage,
@@ -297,6 +298,16 @@ function ProductoRow({
           }}
         />
       </label>
+      <PreciosTalleEditor
+        key={JSON.stringify([
+          producto.tramos,
+          producto.costo,
+          producto.opciones,
+        ])}
+        slug={slug}
+        producto={producto}
+        onSaved={onSaved}
+      />
       <GuiaTallesEditor slug={slug} producto={producto} onSaved={onSaved} />
       {message ? (
         <p className="text-meta text-success" role="status">

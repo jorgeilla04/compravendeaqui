@@ -77,6 +77,10 @@ export interface Producto {
   opciones: string[];
   foto_url: string | null;
   medidas?: Medidas | null;
+  /** Talles con precio propio (null = consultar); el resto vale `precio`. */
+  precios_talle?: Record<string, string | null>;
+  /** El precio más económico que se puede comprar (null: todo a consultar). */
+  precio_desde?: string | null;
 }
 
 export interface GrupoDetalle extends Grupo {
@@ -178,8 +182,17 @@ export interface ProductoAdmin {
   opciones: string[];
   foto_url: string | null;
   medidas?: Medidas | null;
+  tramos?: Tramo[];
+  costo?: string | null;
   orden: number;
   activo: boolean;
+}
+
+/** Precio de un grupo de talles (precio null = consultar). */
+export interface Tramo {
+  talles: string[];
+  precio: string | null;
+  costo: string | null;
 }
 
 export interface PrecioGrupo {

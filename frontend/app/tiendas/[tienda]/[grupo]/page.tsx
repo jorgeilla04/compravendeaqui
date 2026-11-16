@@ -100,6 +100,7 @@ export default async function GrupoPage({ params }: Props) {
               grupo={grupo}
               producto={producto}
               opcionLabel={tienda.opcion_label}
+              whatsappUrl={tienda.whatsapp_url}
             />
           ))}
         </ul>
