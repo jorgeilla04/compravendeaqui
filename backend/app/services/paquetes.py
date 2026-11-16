@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.core import ratelimit
 from app.core.logging import get_logger
 from app.core.phone import wa_digits
 from app.models import Consulta, Paquete, Reserva, Salida, Transportista
@@ -244,8 +245,8 @@ def cambiar_estado(db: Session, reserva: Reserva, estado: str) -> None:
     db.commit()
 
 
-RESERVAS_POR_EMAIL = 3  # por empresa
-RESERVAS_POR_EMAIL_SITIO = 6  # tope de la casilla en todo el sitio
+RESERVAS_POR_EMAIL = 3  # por empresa, al reservar
+MAILS_POR_CASILLA = 6  # mails de reserva a una misma casilla, en todo el sitio
 
 
 def _digest(email: str) -> str:
@@ -253,15 +254,20 @@ def _digest(email: str) -> str:
     return hashlib.sha256(email.strip().lower().encode()).hexdigest()[:32]
 
 
-def claves_email(transportista: Transportista, email: str) -> list[tuple[str, int]]:
-    """Contadores (clave, tope) de reservas por email: uno por empresa (quien
-    use el email de otro lo bloquea como mucho en una agencia) y uno del sitio
-    (ninguna casilla recibe más de 6 mails de reserva por día)."""
-    digest = _digest(email)
-    return [
-        (f"rl:paquetes:email:emp:{transportista.id}:{digest}", RESERVAS_POR_EMAIL),
-        (f"rl:paquetes:email:sitio:{digest}", RESERVAS_POR_EMAIL_SITIO),
-    ]
+def clave_email(transportista: Transportista, email: str) -> str:
+    """Tope de reservas por empresa y email: quien use el email de otro lo
+    bloquea como mucho en esa agencia."""
+    return f"rl:paquetes:email:emp:{transportista.id}:{_digest(email)}"
+
+
+def puede_mandar_a(email: str) -> bool:
+    """Tope de mails de reserva a una casilla en todo el sitio. Se aplica al
+    enviar, no al reservar: nadie pierde la reserva por un email ajeno, y la
+    respuesta no revela si ese email reservó en otro lado."""
+    permitido, _ = ratelimit.hit(
+        f"rl:paquetes:email:mails:{_digest(email)}", MAILS_POR_CASILLA, 86400
+    )
+    return permitido
 
 
 def whatsapp_reserva(reserva: Reserva) -> str:
@@ -333,6 +339,9 @@ def notificar_reserva(reserva: Reserva) -> None:
         if t.datos_transferencia
         else "Te escribimos para coordinar el pago de la seña.\n\n"
     )
+    if not puede_mandar_a(reserva.email):
+        log.warning("paquetes.mail_cliente_omitido", ref=reserva.codigo)
+        return
     horas = int(VENCE_SIN_SENA.total_seconds() // 3600)
     _send(
         reserva.email,

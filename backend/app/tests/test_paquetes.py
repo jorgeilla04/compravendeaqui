@@ -265,3 +265,23 @@ def test_limite_por_email_solo_cuenta_reservas_hechas(
     r = client.post(url, json={**CLIENTE, "salida_id": salida_id, "pasajeros": 1})
     assert r.status_code == 429
     assert "No pudimos tomar la reserva" in r.json()["detail"]
+
+
+def test_tope_de_mails_por_casilla_no_impide_reservar(
+    client: TestClient,
+    paquete: dict[str, Any],
+    mails: list[EmailMessage],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services import paquetes as service
+
+    monkeypatch.setattr(service, "MAILS_POR_CASILLA", 1)
+    salida_id = paquete["salidas"][0]["id"]
+    url = f"{API}/paquetes/{paquete['slug']}/reservas"
+    for _ in range(2):
+        r = client.post(url, json={**CLIENTE, "salida_id": salida_id, "pasajeros": 1})
+        assert r.status_code == 201, r.text
+    # La agencia recibe las dos; el cliente, un solo mail.
+    destinos = [m["To"] for m in mails]
+    assert destinos.count("administracion@blancapalomasrl.com.ar") == 2
+    assert destinos.count("laura@gmail.com") == 1
