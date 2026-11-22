@@ -4,17 +4,27 @@ import Link from "next/link";
 
 import { HomeCarousel, type Slide } from "@/components/home/home-carousel";
 import { ListingRow } from "@/components/home/listing-row";
+import { UniformesDestacados } from "@/components/home/uniformes-destacados";
 import { CategoryIcon } from "@/components/listings/category-icon";
 import { ListingGrid } from "@/components/listings/listing-grid";
 import { Button } from "@/components/ui/button";
 import { serverGet } from "@/lib/api";
-import type { TiendaResumen } from "@/lib/tiendas/types";
+import type { GrupoDetalle, Tienda, TiendaResumen } from "@/lib/tiendas/types";
 import type { CategoryNode, ListingPage } from "@/lib/types";
 
 export const revalidate = 60;
 
 /** Fotos de Ischigualasto (Wikimedia Commons, licencias CC BY-SA). */
 const SLIDES: Slide[] = [
+  {
+    id: "uniformes",
+    titulo: "Uniformes escolares 2027",
+    texto:
+      "El uniforme de tu colegio, con guía de talles en cm y envío a tu casa. Reservás con una seña.",
+    cta: { href: "/tiendas/uniformes", label: "Elegí tu colegio" },
+    imagen: "/home/uniformes.webp",
+    encuadre: "89% 50%",
+  },
   {
     id: "publicar",
     titulo: "Comprá y vendé en San Juan",
@@ -45,11 +55,11 @@ const SLIDES: Slide[] = [
     },
   },
   {
-    id: "uniformes",
-    titulo: "Uniformes escolares",
+    id: "viajes",
+    titulo: "Viajes y paquetes de verano",
     texto:
-      "El uniforme de tu colegio con envío a tu casa. Pagás una seña y el resto cuando lo recibís.",
-    cta: { href: "/tiendas/uniformes", label: "Elegir colegio" },
+      "Mar del Plata, Villa Gesell, Merlo y más, saliendo desde San Juan. Reservá tu lugar con seña.",
+    cta: { href: "/transporte/blanca-paloma/paquetes", label: "Ver paquetes" },
     imagen: "/home/lomas.webp",
     encuadre: "60% 50%",
     credito: {
@@ -60,6 +70,29 @@ const SLIDES: Slide[] = [
     },
   },
 ];
+
+/** La tienda de uniformes y su precio más económico, para el destacado. */
+async function getUniformes(): Promise<{
+  tienda: Tienda;
+  precioDesde: number | null;
+} | null> {
+  const tienda = await serverGet<Tienda>(
+    "/tiendas/uniformes",
+    undefined,
+    300,
+  ).catch(() => null);
+  if (!tienda || tienda.grupos.length === 0) return null;
+  // Los precios por talle valen para todos los colegios: con uno alcanza.
+  const grupo = await serverGet<GrupoDetalle>(
+    `/tiendas/uniformes/grupos/${tienda.grupos[0].slug}`,
+    undefined,
+    300,
+  ).catch(() => null);
+  const precios = (grupo?.productos ?? [])
+    .map((p) => Number(p.precio_desde ?? p.precio))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  return { tienda, precioDesde: precios.length ? Math.min(...precios) : null };
+}
 
 /** Filas de la portada, en orden: el rubro y cómo se titula. */
 const FILAS = [
@@ -79,7 +112,7 @@ const FILAS = [
  * rubro, tiendas y lo último publicado. Cada bloque se oculta si no tiene datos.
  */
 export default async function HomePage() {
-  const [categories, recent, tiendas, ...filas] = await Promise.all([
+  const [categories, recent, tiendas, uniformes, ...filas] = await Promise.all([
     serverGet<CategoryNode[]>("/categories", undefined, 3600).catch(() => null),
     serverGet<ListingPage>(
       "/listings",
@@ -87,6 +120,7 @@ export default async function HomePage() {
       60,
     ).catch(() => null),
     serverGet<TiendaResumen[]>("/tiendas", undefined, 3600).catch(() => null),
+    getUniformes(),
     ...FILAS.map((fila) =>
       serverGet<ListingPage>(
         "/listings",
@@ -147,6 +181,13 @@ export default async function HomePage() {
           </nav>
         ) : null}
       </div>
+
+      {uniformes ? (
+        <UniformesDestacados
+          tienda={uniformes.tienda}
+          precioDesde={uniformes.precioDesde}
+        />
+      ) : null}
 
       {filasVisibles.map((fila) =>
         fila ? (

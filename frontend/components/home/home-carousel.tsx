@@ -16,7 +16,8 @@ export interface Slide {
   imagen: string;
   /** Encuadre de la foto (object-position) para que el motivo no quede tapado. */
   encuadre: string;
-  credito: { autor: string; licencia: string; fuente: string };
+  /** Foto de terceros (licencia CC): se acredita sobre la imagen. */
+  credito?: { autor: string; licencia: string; fuente: string };
 }
 
 const INTERVALO_MS = 7000;
@@ -122,14 +123,16 @@ export function HomeCarousel({ slides }: { slides: Slide[] }) {
                   <Link href={slide.cta.href}>{slide.cta.label}</Link>
                 </Button>
               </div>
-              <a
-                href={slide.credito.fuente}
-                target="_blank"
-                rel="noopener noreferrer license"
-                className="absolute right-3 top-2 rounded-input bg-[rgb(14_22_42/0.55)] px-1.5 text-[0.6875rem] leading-5 text-header-foreground underline-offset-2 hover:underline"
-              >
-                Foto: {slide.credito.autor} · {slide.credito.licencia}
-              </a>
+              {slide.credito ? (
+                <a
+                  href={slide.credito.fuente}
+                  target="_blank"
+                  rel="noopener noreferrer license"
+                  className="absolute right-3 top-2 rounded-input bg-[rgb(14_22_42/0.55)] px-1.5 text-[0.6875rem] leading-5 text-header-foreground underline-offset-2 hover:underline"
+                >
+                  Foto: {slide.credito.autor} · {slide.credito.licencia}
+                </a>
+              ) : null}
             </div>
           );
         })}

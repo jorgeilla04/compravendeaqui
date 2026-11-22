@@ -18,6 +18,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       tienda.descripcion ??
       `Comprá en ${tienda.nombre} con envío a tu casa y pago con Mercado Pago.`,
     alternates: { canonical: `/tiendas/${tienda.slug}` },
+    // Imagen propia para compartir la campaña de uniformes en redes.
+    openGraph:
+      tienda.slug === "uniformes"
+        ? {
+            title: "Uniformes escolares 2027 en San Juan",
+            description:
+              "Elegí tu colegio y tu talle, y te lo llevamos a casa. 42 colegios.",
+            images: [{ url: "/og/uniformes.jpg", width: 1200, height: 630 }],
+          }
+        : undefined,
   };
 }
 
