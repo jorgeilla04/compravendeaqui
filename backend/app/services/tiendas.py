@@ -21,7 +21,8 @@ from app.config import settings
 from app.core.logging import get_logger
 from app.core.phone import wa_digits
 from app.models import Grupo, Pedido, PedidoItem, PrecioGrupo, Producto, Tienda, User
-from app.models.tiendas import TiendaAdmin
+from app.models.tiendas import TiendaAdmin, TiendaConsulta
+from app.schemas.tiendas import ConsultaTiendaIn
 from app.services import images as image_service
 from app.services import mailer, mercadopago, storage
 
@@ -809,6 +810,65 @@ def _notificar_vendedor(db: Session, pedido: Pedido) -> None:
         return
     pedido.notificado_at = datetime.now(UTC)
     db.commit()
+
+
+# --- Consultas ----------------------------------------------------------------
+
+
+def whatsapp_consulta_grupo(tienda: Tienda, grupo: str | None) -> str:
+    label = tienda.grupo_label.lower()
+    hola = f"Hola {_primer_nombre(tienda.vendedor_nombre)}"
+    texto = (
+        f"{hola}, ¿tienen {tienda.nombre.lower()} del {label} {grupo}? Lo busqué "
+        "en CompraVendeAquí y no lo encontré."
+        if grupo
+        else f"{hola}, te escribo por {tienda.nombre} de CompraVendeAquí."
+    )
+    return _wa(tienda.vendedor_whatsapp, texto)
+
+
+def registrar_consulta(
+    db: Session, tienda: Tienda, body: ConsultaTiendaIn
+) -> TiendaConsulta:
+    """Guarda la consulta y le avisa por mail a quien atiende la tienda."""
+    consulta = TiendaConsulta(
+        tienda_id=tienda.id,
+        grupo=body.grupo,
+        nombre=body.nombre,
+        telefono=body.telefono,
+        mensaje=body.mensaje,
+        estado="nueva",
+        created_at=datetime.now(UTC),
+    )
+    db.add(consulta)
+    db.commit()
+    db.refresh(consulta)
+    if not settings.email_configured:
+        log.warning("tiendas.consulta_sin_email", id=str(consulta.id))
+        return consulta
+    label = tienda.grupo_label.lower()
+    sobre = f"{label} {consulta.grupo}" if consulta.grupo else tienda.nombre
+    texto = "\n".join(
+        [
+            f"Consulta por {sobre} — {tienda.nombre}",
+            "",
+            f"Nombre: {consulta.nombre}",
+            f"Teléfono: {consulta.telefono}",
+            "",
+            consulta.mensaje or "(sin mensaje)",
+            "",
+            f"Responder por WhatsApp: https://wa.me/{wa_digits(consulta.telefono)}",
+        ]
+    )
+    msg = mailer.new_message(
+        tienda.vendedor_email, f"Consulta: {sobre} — {tienda.nombre}"
+    )
+    msg.set_content(texto)
+    try:
+        mailer.send(msg)
+    except mailer.MailError as exc:
+        log.error("tiendas.consulta_mail_fallido", id=str(consulta.id), error=str(exc))
+    return consulta
 
 
 # --- Administración -----------------------------------------------------------

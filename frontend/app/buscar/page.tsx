@@ -49,7 +49,9 @@ export default async function SearchPage({ searchParams }: Props) {
       <h1 className="font-heading text-h1 font-semibold">
         {filters.q ? `Resultados para “${filters.q}”` : "Todos los avisos"}
       </h1>
-      {tiendas?.length ? <TiendasEncontradas encontradas={tiendas} /> : null}
+      {tiendas?.length ? (
+        <TiendasEncontradas encontradas={tiendas} q={filters.q} />
+      ) : null}
       {page ? (
         <SearchResults
           basePath="/buscar"

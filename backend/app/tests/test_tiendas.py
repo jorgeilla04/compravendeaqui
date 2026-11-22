@@ -1333,3 +1333,40 @@ TALLES_5XL = [
     "4", "6", "8", "10", "12", "14", "16",
     "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL",
 ]  # fmt: skip
+
+
+def test_consulta_por_colegio_que_no_esta(
+    admin: TestClient,
+    client: TestClient,
+    sent_mail: list[EmailMessage],
+) -> None:
+    r = client.post(
+        f"{API}/uniformes/consultas",
+        json={
+            "grupo": "  Colegio  Nuevo Horizonte ",
+            "nombre": "Ana",
+            "telefono": "264 412-3456",
+            "mensaje": "Necesito chomba talle 10",
+        },
+    )
+    assert r.status_code == 201, r.text
+    url = r.json()["whatsapp_url"]
+    assert url.startswith("https://wa.me/")
+    assert "Colegio%20Nuevo%20Horizonte" in url
+
+    (msg,) = sent_mail
+    assert msg["To"] == "virginialauratello@gmail.com"
+    assert "Colegio Nuevo Horizonte" in msg["Subject"]
+    assert "chomba talle 10" in msg.get_content()
+
+    (consulta,) = admin.get(f"{ADMIN}/uniformes/consultas").json()
+    assert consulta["grupo"] == "Colegio Nuevo Horizonte"
+    assert consulta["telefono"] == "+5492644123456"
+    r = admin.put(
+        f"{ADMIN}/uniformes/consultas/{consulta['id']}", json={"estado": "respondida"}
+    )
+    assert r.json()["estado"] == "respondida"
+
+    # Sin teléfono válido no se guarda.
+    malo = {"grupo": "X", "nombre": "Ana", "telefono": "123"}
+    assert client.post(f"{API}/uniformes/consultas", json=malo).status_code == 422

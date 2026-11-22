@@ -5,6 +5,7 @@ import * as React from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { ConfigAdmin } from "@/components/tiendas/admin/config-admin";
+import { ConsultasAdmin } from "@/components/tiendas/admin/consultas-admin";
 import { EncargadosAdmin } from "@/components/tiendas/admin/encargados-admin";
 import { GruposAdmin } from "@/components/tiendas/admin/grupos-admin";
 import { PedidosAdmin } from "@/components/tiendas/admin/pedidos-admin";
@@ -15,7 +16,13 @@ import { api, ApiError, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { CatalogoAdmin } from "@/lib/tiendas/types";
 
-type Seccion = "pedidos" | "grupos" | "productos" | "config" | "encargados";
+type Seccion =
+  | "pedidos"
+  | "consultas"
+  | "grupos"
+  | "productos"
+  | "config"
+  | "encargados";
 
 export function TiendaAdminPanel({ slug }: { slug: string }) {
   const { user } = useAuth();
@@ -49,6 +56,7 @@ export function TiendaAdminPanel({ slug }: { slug: string }) {
   const { tienda } = catalogo;
   const secciones: { id: Seccion; label: string }[] = [
     { id: "pedidos", label: "Pedidos" },
+    { id: "consultas", label: "Consultas" },
     { id: "grupos", label: `${tienda.grupo_label}s` },
     { id: "productos", label: "Productos y precios" },
     { id: "config", label: "Envío y pagos" },
@@ -99,6 +107,9 @@ export function TiendaAdminPanel({ slug }: { slug: string }) {
         {secciones.find((s) => s.id === seccion)?.label}
       </h2>
       {seccion === "pedidos" ? <PedidosAdmin slug={tienda.slug} /> : null}
+      {seccion === "consultas" ? (
+        <ConsultasAdmin slug={tienda.slug} grupoLabel={tienda.grupo_label} />
+      ) : null}
       {seccion === "grupos" ? (
         <GruposAdmin
           tienda={tienda}
