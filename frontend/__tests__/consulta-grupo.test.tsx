@@ -79,19 +79,21 @@ describe("¿No está tu colegio?", () => {
     });
   });
 
-  it("al final del listado también se puede preguntar", async () => {
+  it("junto al buscador se puede preguntar aunque haya resultados", async () => {
     const user = userEvent.setup();
     render(<GrupoExplorer tienda={tienda} />);
+    expect(
+      screen.queryByRole("region", { name: "¿No está tu colegio?" }),
+    ).toBeNull();
+    await user.type(screen.getByLabelText("Buscá tu colegio"), "Santa");
+    await user.click(
+      screen.getByRole("button", { name: "Preguntanos por el tuyo" }),
+    );
     const consulta = screen.getByRole("region", {
       name: "¿No está tu colegio?",
     });
-    await user.click(
-      within(consulta).getByRole("button", {
-        name: "Consultar por mi colegio",
-      }),
-    );
     expect(within(consulta).getByLabelText("Nombre del colegio")).toHaveValue(
-      "",
+      "Santa",
     );
   });
 });

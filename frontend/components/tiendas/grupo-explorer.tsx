@@ -33,6 +33,7 @@ const chip =
 export function GrupoExplorer({ tienda }: { tienda: Tienda }) {
   const [query, setQuery] = React.useState("");
   const [categoria, setCategoria] = React.useState<string | null>(null);
+  const [consultar, setConsultar] = React.useState(false);
   // Desde el buscador del sitio: /tiendas/uniformes?colegio=… llega con la
   // búsqueda hecha (y, si no está, con la consulta lista para mandar).
   React.useEffect(() => {
@@ -78,6 +79,24 @@ export function GrupoExplorer({ tienda }: { tienda: Tienda }) {
             className="h-12 w-full rounded-input border border-border bg-card pl-10 pr-3 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
+        {tienda.grupos.length > 0 && groups.length > 0 ? (
+          consultar ? (
+            <div className="max-w-xl">
+              <ConsultaGrupo tienda={tienda} buscado={query} destacado />
+            </div>
+          ) : (
+            <p className="text-meta text-muted-foreground">
+              ¿No está tu {label}?{" "}
+              <button
+                type="button"
+                onClick={() => setConsultar(true)}
+                className="min-h-11 font-semibold text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Preguntanos por el tuyo
+              </button>
+            </p>
+          )
+        ) : null}
         {usadas.length > 1 ? (
           <div
             role="group"
@@ -160,9 +179,6 @@ export function GrupoExplorer({ tienda }: { tienda: Tienda }) {
           </section>
         ))
       )}
-      {tienda.grupos.length > 0 && groups.length > 0 ? (
-        <ConsultaGrupo tienda={tienda} />
-      ) : null}
     </div>
   );
 }
