@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             title: "Uniformes escolares 2027 en San Juan",
             description:
               "Elegí tu colegio y tu talle, y te lo llevamos a casa. 42 colegios.",
-            images: [{ url: "/og/uniformes.jpg", width: 1200, height: 630 }],
+            images: [{ url: "/og/uniformes-fotos.jpg", width: 1200, height: 630 }],
           }
         : undefined,
   };
