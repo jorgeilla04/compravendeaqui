@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import HomePage from "@/app/page";
@@ -62,7 +62,7 @@ describe("HomePage", () => {
     expect(
       screen.getByRole("heading", {
         level: 2,
-        name: "Comprá y vendé en San Juan",
+        name: "Uniformes escolares 2027",
       }),
     ).toBeInTheDocument();
     expect(
@@ -90,6 +90,50 @@ describe("HomePage", () => {
   });
 });
 
+describe("Uniformes destacados", () => {
+  it("destaca la tienda con el precio más económico y accesos a colegios", async () => {
+    const grupo = (n: number) => ({
+      slug: `colegio-${n}`,
+      nombre: `Colegio ${n}`,
+      subtitulo: "Capital",
+      categoria: null,
+      color1: "#1A2A5E",
+      color2: "#D4AF37",
+      logo_url: null,
+    });
+    mockApi({
+      "/tiendas/uniformes/grupos/": {
+        ...grupo(1),
+        fotos: [],
+        productos: [
+          { slug: "remera", precio: "23000.00", precio_desde: "23000.00" },
+          { slug: "campera", precio: "55000.00", precio_desde: "55000.00" },
+          { slug: "nada", precio: "0", precio_desde: null },
+        ],
+      },
+      "/tiendas/uniformes": {
+        slug: "uniformes",
+        nombre: "Uniformes escolares",
+        modalidades: ["sena", "total"],
+        sena_pct: 10,
+        grupos: Array.from({ length: 10 }, (_, i) => grupo(i + 1)),
+      },
+      "/categories": [],
+      "/listings": { items: [], next_cursor: null },
+    });
+    render(await HomePage());
+    const bloque = screen.getByRole("region", { name: "Uniformes escolares" });
+    expect(within(bloque).getByText("$ 23.000")).toBeVisible();
+    expect(within(bloque).getByText("Reservás con 10% de seña")).toBeVisible();
+    expect(
+      within(bloque).getByRole("link", { name: /Colegio 1\b/ }),
+    ).toHaveAttribute("href", "/tiendas/uniformes/colegio-1");
+    expect(
+      within(bloque).getByRole("link", { name: "Ver los 10 colegios" }),
+    ).toHaveAttribute("href", "/tiendas/uniformes");
+  });
+});
+
 describe("HomeCarousel", () => {
   it("cambia de diapositiva con las flechas y los puntos, y se pausa", async () => {
     const user = userEvent.setup();
@@ -103,17 +147,17 @@ describe("HomeCarousel", () => {
         .getAllByRole("group", { hidden: true })
         .find((g) => g.getAttribute("aria-hidden") === "false");
 
-    expect(activa()).toHaveAccessibleName(/^1 de 3/);
+    expect(activa()).toHaveAccessibleName(/^1 de 4/);
     await user.click(
       screen.getByRole("button", { name: "Diapositiva siguiente" }),
     );
-    expect(activa()).toHaveAccessibleName(/^2 de 3/);
+    expect(activa()).toHaveAccessibleName(/^2 de 4/);
     // Las diapositivas ocultas no se alcanzan con Tab.
     expect(screen.getAllByRole("group", { hidden: true })[0]).toHaveAttribute(
       "inert",
     );
     await user.click(screen.getByRole("button", { name: /Ver diapositiva 3/ }));
-    expect(activa()).toHaveAccessibleName(/^3 de 3/);
+    expect(activa()).toHaveAccessibleName(/^3 de 4/);
     await user.click(
       screen.getByRole("button", { name: "Pausar el carrusel" }),
     );
