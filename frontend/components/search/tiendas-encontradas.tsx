@@ -13,10 +13,36 @@ function plural(label: string) {
  * Lo que la búsqueda encontró en las tiendas (uniformes por colegio, por
  * ejemplo): no son avisos, así que van aparte y arriba de los resultados.
  */
+/** Lo buscado sin las palabras que nombran a la tienda ("uniformes de…"). */
+function sinGenericas(q: string, label: string): string {
+  const genericas = new Set([
+    "uniforme",
+    "uniformes",
+    "escolar",
+    "escolares",
+    "de",
+    "del",
+    "la",
+    "el",
+    "para",
+  ]);
+  const l = label.toLowerCase();
+  return q
+    .split(/\s+/)
+    .filter((w) => w && !genericas.has(w.toLowerCase()))
+    .filter(
+      (w, i) =>
+        i > 0 || !w.toLowerCase().startsWith(l) || w.length > l.length + 2,
+    )
+    .join(" ");
+}
+
 export function TiendasEncontradas({
   encontradas,
+  q = "",
 }: {
   encontradas: TiendaEncontrada[];
+  q?: string;
 }) {
   return encontradas.map(({ tienda, grupo_label, grupos, total_grupos }) => {
     const id = `tienda-${tienda.slug}`;
@@ -66,6 +92,17 @@ export function TiendasEncontradas({
               </li>
             ))}
           </ul>
+        ) : null}
+        {grupos.length === 0 && sinGenericas(q, grupo_label) ? (
+          <p className="text-meta">
+            ¿No está tu {grupo_label.toLowerCase()}?{" "}
+            <Link
+              href={`/tiendas/${tienda.slug}?${new URLSearchParams({ colegio: sinGenericas(q, grupo_label) })}#no-esta`}
+              className="font-semibold text-primary underline underline-offset-4"
+            >
+              Preguntanos por el tuyo
+            </Link>
+          </p>
         ) : null}
       </section>
     );

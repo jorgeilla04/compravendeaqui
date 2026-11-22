@@ -3,6 +3,7 @@
 import { Search } from "lucide-react";
 import * as React from "react";
 
+import { ConsultaGrupo } from "@/components/tiendas/consulta-grupo";
 import { GrupoCard } from "@/components/tiendas/grupo-card";
 import { cn } from "@/lib/utils";
 import type { Grupo, Tienda } from "@/lib/tiendas/types";
@@ -32,6 +33,12 @@ const chip =
 export function GrupoExplorer({ tienda }: { tienda: Tienda }) {
   const [query, setQuery] = React.useState("");
   const [categoria, setCategoria] = React.useState<string | null>(null);
+  // Desde el buscador del sitio: /tiendas/uniformes?colegio=… llega con la
+  // búsqueda hecha (y, si no está, con la consulta lista para mandar).
+  React.useEffect(() => {
+    const buscado = new URLSearchParams(window.location.search).get("colegio");
+    if (buscado) setQuery(buscado.slice(0, 160));
+  }, []);
   const label = tienda.grupo_label.toLowerCase();
   const found = filterGrupos(tienda.grupos, query, categoria);
   const usadas = tienda.categorias.filter((c) =>
@@ -124,19 +131,13 @@ export function GrupoExplorer({ tienda }: { tienda: Tienda }) {
           </a>
         </div>
       ) : groups.length === 0 ? (
-        <p className="text-muted-foreground">
-          No encontramos “{query}”. Probá con otra palabra o escribile a{" "}
-          {tienda.vendedor_nombre}{" "}
-          <a
-            href={tienda.whatsapp_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-primary underline underline-offset-4"
-          >
-            por WhatsApp
-          </a>
-          .
-        </p>
+        <div className="flex flex-col gap-4">
+          <p className="text-muted-foreground">
+            No encontramos “{query}” entre los {tienda.grupos.length} {label}s
+            cargados.
+          </p>
+          <ConsultaGrupo tienda={tienda} buscado={query} destacado />
+        </div>
       ) : (
         groups.map((group) => (
           <section
@@ -159,6 +160,9 @@ export function GrupoExplorer({ tienda }: { tienda: Tienda }) {
           </section>
         ))
       )}
+      {tienda.grupos.length > 0 && groups.length > 0 ? (
+        <ConsultaGrupo tienda={tienda} />
+      ) : null}
     </div>
   );
 }

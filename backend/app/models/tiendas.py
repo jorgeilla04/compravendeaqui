@@ -220,3 +220,19 @@ class PedidoItem(Base):
     precio_unit: Mapped[Decimal] = mapped_column(MONEY)
 
     pedido: Mapped[Pedido] = relationship(back_populates="items")
+
+
+class TiendaConsulta(UUIDPrimaryKeyMixin, Base):
+    """Consulta de un cliente: por ejemplo, un colegio que no está en la tienda."""
+
+    __tablename__ = "tienda_consultas"
+
+    tienda_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("tiendas.id", ondelete="CASCADE"), index=True
+    )
+    grupo: Mapped[str | None] = mapped_column(String(160))  # el colegio buscado
+    nombre: Mapped[str] = mapped_column(String(120))
+    telefono: Mapped[str] = mapped_column(String(30))
+    mensaje: Mapped[str | None] = mapped_column(Text)
+    estado: Mapped[str] = mapped_column(String(20), default="nueva")  # respondida
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

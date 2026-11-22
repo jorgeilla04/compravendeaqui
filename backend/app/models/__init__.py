@@ -13,6 +13,7 @@ from app.models.tiendas import (
     Producto,
     Tienda,
     TiendaAdmin,
+    TiendaConsulta,
 )
 from app.models.transporte import (
     Consulta,
@@ -45,6 +46,7 @@ __all__ = [
     "Salida",
     "Tienda",
     "TiendaAdmin",
+    "TiendaConsulta",
     "TransporteAdmin",
     "TransportePedido",
     "Transportista",

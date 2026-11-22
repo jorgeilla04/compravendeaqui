@@ -16,9 +16,11 @@ from sqlalchemy import delete, select
 from app.api.deps import AdminUser, CompleteUser, DbSession
 from app.api.v1.endpoints.tiendas import pedido_out
 from app.models import Grupo, Pedido, PrecioGrupo, Producto, Tienda, User
-from app.models.tiendas import TiendaAdmin
+from app.models.tiendas import TiendaAdmin, TiendaConsulta
 from app.schemas.tiendas import (
     CatalogoAdminOut,
+    ConsultaTiendaAdminOut,
+    ConsultaTiendaEstadoIn,
     EncargadoIn,
     EncargadoOut,
     EstadoPedido,
@@ -495,3 +497,42 @@ def quitar_foto_en_grupo(
     db.commit()
     service.borrar_imagenes([anterior])
     return _precio_out(grupo, producto, fila)
+
+
+# --- Consultas ----------------------------------------------------------------
+
+
+@router.get("/{slug}/consultas", response_model=list[ConsultaTiendaAdminOut])
+def consultas(
+    slug: str, user: CompleteUser, db: DbSession
+) -> list[ConsultaTiendaAdminOut]:
+    tienda = _tienda(db, user, slug)
+    rows = db.scalars(
+        select(TiendaConsulta)
+        .where(TiendaConsulta.tienda_id == tienda.id)
+        .order_by(TiendaConsulta.created_at.desc())
+        .limit(300)
+    )
+    return [ConsultaTiendaAdminOut.model_validate(c) for c in rows]
+
+
+@router.put("/{slug}/consultas/{consulta_id}", response_model=ConsultaTiendaAdminOut)
+def estado_consulta(
+    slug: str,
+    consulta_id: uuid.UUID,
+    body: ConsultaTiendaEstadoIn,
+    user: CompleteUser,
+    db: DbSession,
+) -> ConsultaTiendaAdminOut:
+    tienda = _tienda(db, user, slug)
+    consulta = db.scalars(
+        select(TiendaConsulta).where(
+            TiendaConsulta.id == consulta_id, TiendaConsulta.tienda_id == tienda.id
+        )
+    ).first()
+    if consulta is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Esa consulta no existe")
+    consulta.estado = body.estado
+    db.commit()
+    db.refresh(consulta)
+    return ConsultaTiendaAdminOut.model_validate(consulta)

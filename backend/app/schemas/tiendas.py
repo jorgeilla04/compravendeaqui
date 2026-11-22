@@ -494,3 +494,53 @@ class CatalogoAdminOut(BaseModel):
     grupos: list[GrupoAdminOut]
     productos: list[ProductoAdminOut]
     precios: list[PrecioOut]
+
+
+# --- Consultas ----------------------------------------------------------------
+
+
+class ConsultaTiendaIn(BaseModel):
+    """Consulta de un cliente (ej.: "¿tienen el uniforme de mi colegio?")."""
+
+    grupo: str | None = Field(default=None, max_length=160)
+    nombre: str = Field(min_length=2, max_length=120)
+    telefono: str = Field(min_length=6, max_length=30)
+    mensaje: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("nombre")
+    @classmethod
+    def _nombre(cls, value: str) -> str:
+        return _clean(value)
+
+    @field_validator("telefono")
+    @classmethod
+    def _telefono(cls, value: str) -> str:
+        try:
+            return normalize_ar_mobile(value)
+        except InvalidPhoneError as exc:
+            raise ValueError(str(exc)) from exc
+
+    @field_validator("grupo", "mensaje")
+    @classmethod
+    def _opcional(cls, value: str | None) -> str | None:
+        return " ".join(value.split()) or None if value else None
+
+
+class ConsultaTiendaCreadaOut(BaseModel):
+    whatsapp_url: str
+
+
+class ConsultaTiendaAdminOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    grupo: str | None
+    nombre: str
+    telefono: str
+    mensaje: str | None
+    estado: str
+    created_at: datetime
+
+
+class ConsultaTiendaEstadoIn(BaseModel):
+    estado: Literal["nueva", "respondida"]

@@ -13,6 +13,8 @@ from app.config import settings
 from app.core import ratelimit
 from app.models import Pedido, Tienda
 from app.schemas.tiendas import (
+    ConsultaTiendaCreadaOut,
+    ConsultaTiendaIn,
     GrupoDetalleOut,
     GrupoOut,
     PedidoCreadoOut,
@@ -162,6 +164,28 @@ async def webhook_mercadopago(request: Request, db: DbSession) -> dict[str, bool
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Firma inválida")
     service.sincronizar_pago(db, data_id)
     return {"ok": True}
+
+
+@router.post(
+    "/{slug}/consultas",
+    response_model=ConsultaTiendaCreadaOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def consultar(
+    slug: str, body: ConsultaTiendaIn, request: Request, db: DbSession
+) -> ConsultaTiendaCreadaOut:
+    """Consulta de un cliente, como un colegio que todavía no está cargado."""
+    ratelimit.enforce(
+        f"rl:tiendas:consulta:{ratelimit.client_ip(request)}",
+        10,
+        3600,
+        "Ya nos dejaste varias consultas. Te respondemos a la brevedad.",
+    )
+    found = service.get_tienda(db, slug)
+    service.registrar_consulta(db, found, body)
+    return ConsultaTiendaCreadaOut(
+        whatsapp_url=service.whatsapp_consulta_grupo(found, body.grupo)
+    )
 
 
 @router.get("/{slug}", response_model=TiendaOut)
