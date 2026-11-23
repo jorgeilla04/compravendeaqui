@@ -4,20 +4,24 @@ import * as React from "react";
 
 import { useOptionalAuth } from "@/components/auth/auth-provider";
 import { PublicarEnRedes } from "@/components/redes/publicar-en-redes";
-import type { GrupoDetalle } from "@/lib/tiendas/types";
+
+export function esAdminDelSitio(rol: string | undefined) {
+  return rol === "admin";
+}
 
 /**
- * "Publicar en redes" en la página de un colegio (solo administradores):
- * se elige la prenda y se publica con el precio y la foto de ese colegio.
+ * "Publicar en redes" de las prendas de un colegio (solo administradores del
+ * sitio): se elige la prenda y se publica con el precio y la foto de ese
+ * colegio. Está en la página del colegio y en el panel de la tienda.
  */
 export function PublicarProductoEnRedes({
   tienda,
   grupo,
 }: {
   tienda: string;
-  grupo: GrupoDetalle;
+  grupo: { slug: string; productos: { slug: string; nombre: string }[] };
 }) {
-  const esAdmin = useOptionalAuth()?.user?.role === "admin";
+  const esAdmin = esAdminDelSitio(useOptionalAuth()?.user?.role);
   const [producto, setProducto] = React.useState(
     grupo.productos[0]?.slug ?? "",
   );

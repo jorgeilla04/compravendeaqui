@@ -885,6 +885,44 @@ describe("administración de tiendas", () => {
     ).toBeVisible();
   });
 
+  it("el administrador del sitio publica una prenda desde la pestaña Redes", async () => {
+    const user = userEvent.setup();
+    const redes = "/admin/redes/tiendas/uniformes/grupos/santa-rosa/productos";
+    mockApi({
+      "GET /auth/me": () => ({ status: 200, json: me("admin") }),
+      "GET /admin/tiendas/uniformes/catalogo": () => ({
+        status: 200,
+        json: catalogo,
+      }),
+      "GET /admin/tiendas/uniformes/pedidos": () => ({ status: 200, json: [] }),
+      [`GET ${redes}/remera`]: () => ({
+        status: 200,
+        json: {
+          textos: { facebook: "Remera", instagram: "Remera" },
+          conectadas: { facebook: true, instagram: false },
+          publicaciones: [],
+        },
+      }),
+    });
+    renderPanel();
+    await user.click(await screen.findByRole("button", { name: "Colegios" }));
+    await user.click(
+      screen.getByRole("button", { name: /Colegio Santa Rosa de Lima/ }),
+    );
+    const ventana = screen.getByRole("dialog", {
+      name: "Colegio Santa Rosa de Lima",
+    });
+    await user.click(within(ventana).getByRole("tab", { name: "Redes" }));
+    expect(within(ventana).getByLabelText("Prenda")).toHaveValue("remera");
+    expect(
+      await within(ventana).findByAltText("Imagen que se va a publicar"),
+    ).toHaveAttribute(
+      "src",
+      expect.stringContaining(`${redes}/remera/imagen.jpg`),
+    );
+    expect(within(ventana).getByLabelText(/Facebook/)).toBeEnabled();
+  });
+
   it("edita un colegio en una ventana con pestañas", async () => {
     const user = userEvent.setup();
     const base = "/admin/tiendas/uniformes/grupos/santa-rosa";
@@ -960,6 +998,10 @@ describe("administración de tiendas", () => {
     expect(
       within(ventana).getByRole("tab", { name: "Datos y fotos" }),
     ).toHaveAttribute("aria-selected", "true");
+    // Publicar en las redes del sitio es solo para administradores del sitio.
+    expect(
+      within(ventana).queryByRole("tab", { name: "Redes" }),
+    ).not.toBeInTheDocument();
 
     const archivo = new File(["x"], "uniforme.png", { type: "image/png" });
     await user.upload(within(ventana).getByLabelText("Agregar foto"), archivo);
