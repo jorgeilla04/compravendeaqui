@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, RotateCcw } from "lucide-react";
+import { ExternalLink, RotateCcw, Trash2 } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,10 @@ import { api, errorMessage } from "@/lib/api";
 import { ESTADO_LABEL, fechaHora, type Publicacion, REDES } from "@/lib/redes";
 import { cn } from "@/lib/utils";
 
-/** Una publicación: red, estado, link al post o el error con "Reintentar". */
+/**
+ * Una publicación: red, estado, link al post o el error con "Reintentar", y
+ * "Eliminar" (borra el post de Facebook; Instagram no lo permite por API).
+ */
 export function EstadoPublicacion({
   publicacion,
   onChange,
@@ -22,6 +25,31 @@ export function EstadoPublicacion({
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const red = REDES.find((r) => r.id === publicacion.red)?.nombre;
+
+  async function eliminar() {
+    const pregunta =
+      publicacion.estado === "publicada"
+        ? `¿Borrar esta publicación de ${red}? No se puede deshacer.`
+        : "¿Quitar esta publicación con error?";
+    if (!window.confirm(pregunta)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      onChange(
+        await api<Publicacion>(`/admin/redes/${publicacion.id}`, {
+          method: "DELETE",
+        }),
+      );
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const sePuedeBorrar =
+    publicacion.estado === "error" ||
+    (publicacion.estado === "publicada" && publicacion.red === "facebook");
 
   async function reintentar() {
     setSaving(true);
@@ -49,6 +77,8 @@ export function EstadoPublicacion({
             publicacion.estado === "publicada" && "bg-success text-white",
             publicacion.estado === "error" && "bg-destructive text-white",
             publicacion.estado === "pendiente" && "bg-muted text-foreground",
+            publicacion.estado === "eliminada" &&
+              "bg-muted text-muted-foreground",
           )}
         >
           {ESTADO_LABEL[publicacion.estado]}
@@ -57,6 +87,20 @@ export function EstadoPublicacion({
           {fechaHora(publicacion.publicada_at ?? publicacion.created_at)}
         </span>
         {titulo}
+        {sePuedeBorrar ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="ml-auto text-destructive hover:text-destructive"
+            onClick={() => void eliminar()}
+            disabled={saving}
+            aria-label={`Eliminar la publicación de ${red}`}
+          >
+            <Trash2 aria-hidden="true" />
+            Eliminar
+          </Button>
+        ) : null}
       </div>
       {publicacion.permalink ? (
         <a

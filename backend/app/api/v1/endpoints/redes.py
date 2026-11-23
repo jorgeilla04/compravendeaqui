@@ -190,12 +190,26 @@ def reintentar(
     fila = db.get(PublicacionRed, publicacion_id)
     if fila is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No existe")
-    if fila.estado == "publicada":
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="Ya está publicada")
+    if fila.estado != "error":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, detail="Solo se reintentan las que dieron error"
+        )
     if not service.configurada(fila.red):
         raise HTTPException(
             status.HTTP_409_CONFLICT, detail=f"Falta conectar {fila.red.capitalize()}"
         )
     service.publicar(db, fila)
+    db.refresh(fila)
+    return PublicacionOut.model_validate(fila)
+
+
+@router.delete("/{publicacion_id}", response_model=PublicacionOut)
+def eliminar(publicacion_id: uuid.UUID, _: AdminUser, db: DbSession) -> PublicacionOut:
+    """Borra el post de la red (Facebook) y lo deja en el historial como
+    eliminado."""
+    fila = db.get(PublicacionRed, publicacion_id)
+    if fila is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No existe")
+    service.eliminar(db, fila)
     db.refresh(fila)
     return PublicacionOut.model_validate(fila)

@@ -47,6 +47,10 @@ CONDICION = {"nuevo": "Nuevo", "usado": "Usado", "reacondicionado": "Reacondicio
 class MetaError(Exception):
     """La API de Meta rechazó la publicación (el mensaje es para mostrar)."""
 
+    def __init__(self, mensaje: str, codigo: int | None = None) -> None:
+        super().__init__(mensaje)
+        self.codigo = codigo
+
 
 def configurada(red: str) -> bool:
     if red == "facebook":
@@ -319,21 +323,25 @@ def componer(pieza: Pieza) -> bytes:
 
 
 def _meta(method: str, path: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
-    payload = {**(data or {}), "access_token": settings.meta_page_token}
+    # El token va en el encabezado, no en la URL (no queda en ningún log).
     try:
         response = httpx.request(
             method,
             f"{settings.meta_graph_url}/{path}",
-            data=payload if method == "POST" else None,
-            params=payload if method == "GET" else None,
+            data=data if method == "POST" else None,
+            params=data if method != "POST" else None,
+            headers={"Authorization": f"OAuth {settings.meta_page_token}"},
             timeout=HTTP_TIMEOUT,
         )
         body: dict[str, Any] = response.json()
     except (httpx.HTTPError, ValueError) as exc:
         raise MetaError("No pudimos conectarnos con Meta. Probá de nuevo.") from exc
     if response.status_code >= 400 or "error" in body:
-        mensaje = body.get("error", {}).get("message", "Error desconocido de Meta")
-        raise MetaError(mensaje)
+        error = body.get("error", {})
+        raise MetaError(
+            error.get("message", "Error desconocido de Meta"),
+            codigo=error.get("code"),
+        )
     return body
 
 
@@ -427,6 +435,37 @@ def crear_publicaciones(
     for fila in filas:
         db.refresh(fila)
     return filas
+
+
+def eliminar(db: Session, fila: PublicacionRed) -> None:
+    """Borra el post de Facebook y deja la publicación como "eliminada" (queda
+    en el historial). Si nunca llegó a publicarse (error), solo se marca."""
+    if fila.estado == "pendiente":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail="Se está publicando. Esperá unos segundos y probá de nuevo.",
+        )
+    if fila.estado == "eliminada":
+        return
+    if fila.estado == "publicada" and fila.red == "instagram":
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail="Instagram no deja borrar publicaciones desde otras apps: "
+            "borrala desde la app de Instagram.",
+        )
+    if fila.estado == "publicada" and fila.post_id:
+        try:
+            _meta("DELETE", fila.post_id)
+        except MetaError as exc:
+            # Código 100: el post ya no existe (lo borraron desde Facebook).
+            if exc.codigo != 100:
+                raise HTTPException(
+                    status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Facebook no la dejó borrar: {exc}",
+                ) from exc
+    fila.estado, fila.permalink, fila.error = "eliminada", None, None
+    db.commit()
+    log.info("redes.eliminada", id=str(fila.id), red=fila.red)
 
 
 def publicar(db: Session, fila: PublicacionRed) -> None:
