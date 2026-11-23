@@ -230,13 +230,48 @@ def test_eliminar_de_facebook_desde_la_herramienta(
 
 
 def test_eliminar_un_post_que_ya_no_existe_en_facebook(
-    admin: TestClient, aviso: dict[str, Any], meta: respx.MockRouter
+    admin: TestClient,
+    aviso: dict[str, Any],
+    meta: respx.MockRouter,
+    fake_storage: dict[str, bytes],
 ) -> None:
     meta.delete(f"{GRAPH}/111_9").mock(
         return_value=httpx.Response(
             400, json={"error": {"code": 100, "message": "Object does not exist"}}
         )
     )
+    consulta = meta.get(f"{GRAPH}/111_9").mock(
+        return_value=httpx.Response(
+            400, json={"error": {"code": 100, "message": "Object does not exist"}}
+        )
+    )
     admin.post(f"{API}/avisos/{aviso['id']}", json={"redes": ["facebook"]})
     (fila,) = admin.get(f"{API}/avisos/{aviso['id']}").json()["publicaciones"]
-    assert admin.delete(f"{API}/{fila['id']}").json()["estado"] == "eliminada"
+    assert any(k.startswith("redes/") for k in fake_storage)
+
+    r = admin.delete(f"{API}/{fila['id']}").json()
+    assert consulta.called  # se confirmó con Meta antes de marcarla
+    assert r["estado"] == "eliminada"
+    assert r["imagen_url"] is None
+    assert not any(k.startswith("redes/") for k in fake_storage)
+
+
+def test_si_facebook_no_deja_borrar_no_se_marca_eliminada(
+    admin: TestClient, aviso: dict[str, Any], meta: respx.MockRouter
+) -> None:
+    meta.delete(f"{GRAPH}/111_9").mock(
+        return_value=httpx.Response(
+            400, json={"error": {"code": 100, "message": "Permisos insuficientes"}}
+        )
+    )
+    meta.get(f"{GRAPH}/111_9").mock(
+        return_value=httpx.Response(200, json={"id": "111_9"})
+    )
+    admin.post(f"{API}/avisos/{aviso['id']}", json={"redes": ["facebook"]})
+    (fila,) = admin.get(f"{API}/avisos/{aviso['id']}").json()["publicaciones"]
+    r = admin.delete(f"{API}/{fila['id']}")
+    assert r.status_code == 502
+    assert "Permisos insuficientes" in r.json()["detail"]
+    (sigue,) = admin.get(f"{API}/avisos/{aviso['id']}").json()["publicaciones"]
+    assert sigue["estado"] == "publicada"
+    assert sigue["permalink"]

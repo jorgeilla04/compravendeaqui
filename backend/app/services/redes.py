@@ -437,9 +437,20 @@ def crear_publicaciones(
     return filas
 
 
+def _post_existe(post_id: str) -> bool:
+    """Confirma con Meta si el post sigue publicado."""
+    try:
+        _meta("GET", post_id, {"fields": "id"})
+    except MetaError:
+        return False
+    return True
+
+
 def eliminar(db: Session, fila: PublicacionRed) -> None:
     """Borra el post de Facebook y deja la publicación como "eliminada" (queda
-    en el historial). Si nunca llegó a publicarse (error), solo se marca."""
+    en el historial, con su post_id). Solo se marca como eliminada cuando Meta
+    confirma que el post ya no está. Si nunca llegó a publicarse (error, sin
+    post_id), solo se marca."""
     if fila.estado == "pendiente":
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -447,25 +458,42 @@ def eliminar(db: Session, fila: PublicacionRed) -> None:
         )
     if fila.estado == "eliminada":
         return
-    if fila.estado == "publicada" and fila.red == "instagram":
+    if fila.post_id and fila.red == "instagram":
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             detail="Instagram no deja borrar publicaciones desde otras apps: "
             "borrala desde la app de Instagram.",
         )
-    if fila.estado == "publicada" and fila.post_id:
+    if fila.post_id:
         try:
             _meta("DELETE", fila.post_id)
         except MetaError as exc:
-            # Código 100: el post ya no existe (lo borraron desde Facebook).
-            if exc.codigo != 100:
+            # Si el borrado falla pero el post ya no existe (lo borraron desde
+            # Facebook), está bien. Si sigue publicado, no se marca nada.
+            if _post_existe(fila.post_id):
                 raise HTTPException(
                     status.HTTP_502_BAD_GATEWAY,
                     detail=f"Facebook no la dejó borrar: {exc}",
                 ) from exc
-    fila.estado, fila.permalink, fila.error = "eliminada", None, None
+    # La imagen subida para el post: se borra si ninguna otra publicación
+    # (ej.: la de Instagram del mismo envío) la sigue usando.
+    en_uso = db.scalar(
+        select(PublicacionRed.id).where(
+            PublicacionRed.imagen_url == fila.imagen_url,
+            PublicacionRed.id != fila.id,
+            PublicacionRed.estado != "eliminada",
+        )
+    )
+    key = storage.key_from_url(fila.imagen_url, "redes/")
+    if key and en_uso is None:
+        try:
+            storage.delete_objects([key])
+        except storage.StorageError as exc:
+            log.warning("redes.imagen_no_borrada", key=key, error=str(exc))
+        fila.imagen_url = None
+    fila.estado, fila.permalink = "eliminada", None
     db.commit()
-    log.info("redes.eliminada", id=str(fila.id), red=fila.red)
+    log.info("redes.eliminada", id=str(fila.id), red=fila.red, post=fila.post_id)
 
 
 def publicar(db: Session, fila: PublicacionRed) -> None:
