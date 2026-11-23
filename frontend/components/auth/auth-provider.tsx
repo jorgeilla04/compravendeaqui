@@ -52,6 +52,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+/** Como useAuth, pero sin AuthProvider devuelve null (paneles opcionales). */
+export function useOptionalAuth(): AuthState | null {
+  return React.useContext(AuthContext);
+}
+
 export function useAuth(): AuthState {
   const ctx = React.useContext(AuthContext);
   if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");

@@ -87,7 +87,8 @@ def _clean_state() -> Iterator[None]:
                 "tienda_pedido_items, tienda_pedidos, tienda_precios, "
                 "tienda_grupos, tienda_admins, tienda_consultas, transporte_pedidos, "
                 "transporte_admins, paquete_consultas, paquete_reservas, "
-                "paquete_salidas, paquetes RESTART IDENTITY CASCADE"
+                "publicaciones_redes, paquete_salidas, paquetes "
+                "RESTART IDENTITY CASCADE"
             )
         )
         # La tienda de uniformes y sus prendas vienen de la migración: se
@@ -186,7 +187,13 @@ def fake_storage(monkeypatch: pytest.MonkeyPatch) -> dict[str, bytes]:
         for key in keys:
             objects.pop(key, None)
 
+    def get_object(key: str) -> bytes:
+        if key not in objects:
+            raise storage.StorageError("No existe")
+        return objects[key]
+
     monkeypatch.setattr(storage, "put_object", put_object)
+    monkeypatch.setattr(storage, "get_object", get_object)
     monkeypatch.setattr(storage, "delete_objects", delete_objects)
     return objects
 

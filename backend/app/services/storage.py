@@ -70,6 +70,16 @@ def put_object(key: str, data: bytes, content_type: str) -> str:
     return public_url(key)
 
 
+def get_object(key: str) -> bytes:
+    try:
+        response = _client().get_object(Bucket=settings.s3_bucket, Key=key)
+        data: bytes = response["Body"].read()
+        return data
+    except (BotoCoreError, ClientError) as exc:
+        log.error("storage.get_failed", key=key, error=str(exc))
+        raise StorageError("No se pudo leer la imagen") from exc
+
+
 def delete_objects(keys: list[str]) -> None:
     if not keys:
         return
