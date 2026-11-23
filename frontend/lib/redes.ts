@@ -6,7 +6,7 @@ export interface Publicacion {
   producto_id: string | null;
   grupo_id: string | null;
   red: Red;
-  estado: "pendiente" | "publicada" | "error";
+  estado: "pendiente" | "publicada" | "error" | "eliminada";
   texto: string;
   imagen_url: string | null;
   permalink: string | null;
@@ -35,6 +35,7 @@ export const ESTADO_LABEL: Record<Publicacion["estado"], string> = {
   pendiente: "Publicando…",
   publicada: "Publicada",
   error: "Error",
+  eliminada: "Eliminada",
 };
 
 export const fechaHora = (iso: string) =>

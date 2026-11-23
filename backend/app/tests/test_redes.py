@@ -192,3 +192,51 @@ def test_publica_un_uniforme_del_colegio(
 
     sin_producto = url.replace("/remera", "/no-existe")
     assert admin.get(sin_producto).status_code == 404
+
+
+def test_eliminar_de_facebook_desde_la_herramienta(
+    admin: TestClient, aviso: dict[str, Any], meta: respx.MockRouter, client: TestClient
+) -> None:
+    borrar = meta.delete(f"{GRAPH}/111_9").mock(
+        return_value=httpx.Response(200, json={"success": True})
+    )
+    admin.post(f"{API}/avisos/{aviso['id']}", json={"redes": ["facebook", "instagram"]})
+    por_red = {
+        p["red"]: p
+        for p in admin.get(f"{API}/avisos/{aviso['id']}").json()["publicaciones"]
+    }
+
+    # Solo un admin borra.
+    assert client.delete(f"{API}/{por_red['facebook']['id']}").status_code == 401
+
+    r = admin.delete(f"{API}/{por_red['facebook']['id']}")
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "eliminada"
+    assert r.json()["permalink"] is None
+    assert borrar.called
+    assert borrar.calls[0].request.headers["Authorization"] == "OAuth token-de-prueba"
+    assert "token" not in str(borrar.calls[0].request.url)
+
+    # Instagram no permite borrar por API: se avisa y no se toca.
+    r = admin.delete(f"{API}/{por_red['instagram']['id']}")
+    assert r.status_code == 409
+    assert "app de Instagram" in r.json()["detail"]
+
+    # Ya eliminada: no se reintenta ni falla al borrar de nuevo.
+    fb = por_red["facebook"]["id"]
+    assert admin.post(f"{API}/{fb}/reintentar").status_code == 409
+    assert admin.delete(f"{API}/{fb}").json()["estado"] == "eliminada"
+    assert borrar.call_count == 1
+
+
+def test_eliminar_un_post_que_ya_no_existe_en_facebook(
+    admin: TestClient, aviso: dict[str, Any], meta: respx.MockRouter
+) -> None:
+    meta.delete(f"{GRAPH}/111_9").mock(
+        return_value=httpx.Response(
+            400, json={"error": {"code": 100, "message": "Object does not exist"}}
+        )
+    )
+    admin.post(f"{API}/avisos/{aviso['id']}", json={"redes": ["facebook"]})
+    (fila,) = admin.get(f"{API}/avisos/{aviso['id']}").json()["publicaciones"]
+    assert admin.delete(f"{API}/{fila['id']}").json()["estado"] == "eliminada"

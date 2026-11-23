@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import { EstadoPublicacion } from "@/components/redes/estado-publicacion";
 import { PublicarEnRedes } from "@/components/redes/publicar-en-redes";
 import { PublicarProductoEnRedes } from "@/components/redes/publicar-producto";
 import type { GrupoDetalle } from "@/lib/tiendas/types";
@@ -141,5 +142,73 @@ describe("Publicar uniformes de un colegio", () => {
       <PublicarProductoEnRedes tienda="uniformes" grupo={grupo} />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("Eliminar una publicación", () => {
+  const base = {
+    id: "p1",
+    listing_id: "a1",
+    producto_id: null,
+    grupo_id: null,
+    texto: "x",
+    imagen_url: null,
+    error: null,
+    created_at: "2026-11-23T14:00:00Z",
+    publicada_at: "2026-11-23T14:00:05Z",
+  };
+
+  it("borra de Facebook desde la herramienta, con confirmación", async () => {
+    const user = userEvent.setup();
+    const confirmar = jest.spyOn(window, "confirm").mockReturnValue(true);
+    const calls = mockApi({
+      "DELETE /admin/redes/p1": () => ({
+        status: 200,
+        json: {
+          ...base,
+          red: "facebook",
+          estado: "eliminada",
+          permalink: null,
+        },
+      }),
+    });
+    const onChange = jest.fn();
+    render(
+      <EstadoPublicacion
+        publicacion={{
+          ...base,
+          red: "facebook",
+          estado: "publicada",
+          permalink: "https://www.facebook.com/1_2",
+        }}
+        onChange={onChange}
+      />,
+    );
+    await user.click(
+      screen.getByRole("button", {
+        name: "Eliminar la publicación de Facebook",
+      }),
+    );
+    expect(confirmar).toHaveBeenCalled();
+    expect(calls[0].key).toBe("DELETE /admin/redes/p1");
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ estado: "eliminada" }),
+    );
+    confirmar.mockRestore();
+  });
+
+  it("en Instagram no ofrece borrar (Meta no lo permite)", () => {
+    render(
+      <EstadoPublicacion
+        publicacion={{
+          ...base,
+          red: "instagram",
+          estado: "publicada",
+          permalink: "https://www.instagram.com/p/x/",
+        }}
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /Eliminar/ })).toBeNull();
   });
 });

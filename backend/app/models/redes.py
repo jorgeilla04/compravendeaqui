@@ -29,7 +29,7 @@ class PublicacionRed(UUIDPrimaryKeyMixin, Base):
     titulo: Mapped[str | None] = mapped_column(String(200))
     url: Mapped[str | None] = mapped_column(Text)
     red: Mapped[str] = mapped_column(String(20))  # facebook | instagram
-    # pendiente | publicada | error
+    # pendiente | publicada | error | eliminada
     estado: Mapped[str] = mapped_column(String(20), default="pendiente")
     texto: Mapped[str] = mapped_column(Text)
     imagen_url: Mapped[str | None] = mapped_column(Text)
