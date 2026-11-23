@@ -1,8 +1,9 @@
 "use client";
 
-import { ImageUp, MessageCircle, Plus, Trash2 } from "lucide-react";
+import { ImageUp, MessageCircle, Plus, Share2, Trash2 } from "lucide-react";
 import * as React from "react";
 
+import { KitRedes } from "@/components/redes/kit-redes";
 import { Button } from "@/components/ui/button";
 import {
   FormMessage,
@@ -204,6 +205,8 @@ function PaqueteEditor({
   const [ok, setOk] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
+  // El kit arma la imagen en el servidor: se carga solo cuando se pide.
+  const [kit, setKit] = React.useState(false);
   const id = `p-${paquete.slug}`;
   const set =
     (k: keyof typeof d) =>
@@ -450,6 +453,21 @@ function PaqueteEditor({
           <Plus aria-hidden="true" />
           Agregar salida
         </Button>
+        {paquete.activo ? (
+          kit ? (
+            <KitRedes path={`${base}/kit`} archivo={paquete.slug} />
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="self-start"
+              onClick={() => setKit(true)}
+            >
+              <Share2 aria-hidden="true" />
+              Kit para tus redes
+            </Button>
+          )
+        ) : null}
       </div>
     </details>
   );

@@ -16,10 +16,12 @@ import httpx
 import pytest
 import respx
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import select, update
 
 from app.config import Settings, settings
 from app.models import Grupo, Pedido, Tienda, User
+from app.models.tiendas import TiendaAdmin
 from app.scripts.fotos_grupo import main as fotos_grupo
 from app.scripts.import_grupos import import_grupos
 from app.scripts.make_admin import set_role
@@ -1370,3 +1372,30 @@ def test_consulta_por_colegio_que_no_esta(
     # Sin teléfono válido no se guarda.
     malo = {"grupo": "X", "nombre": "Ana", "telefono": "123"}
     assert client.post(f"{API}/uniformes/consultas", json=malo).status_code == 422
+
+
+def test_kit_para_redes_de_la_tienda(
+    admin: TestClient, colegio: dict[str, Any], make_user: MakeUser, db: Any
+) -> None:
+    """La encargada de la tienda baja imagen y texto de una prenda para sus
+    propias redes (no publica en las del sitio)."""
+    encargada, data = make_user()
+    otro, _ = make_user()
+    tienda = db.scalars(select(Tienda).where(Tienda.slug == "uniformes")).one()
+    user = db.scalars(
+        select(User).where(User.username == data["user"]["username"])
+    ).one()
+    db.add(TiendaAdmin(tienda_id=tienda.id, user_id=user.id))
+    db.commit()
+
+    kit = f"{ADMIN}/uniformes/grupos/{colegio['slug']}/productos/remera/kit"
+    r = encargada.get(kit)
+    assert r.status_code == 200, r.text
+    assert "· Colegio Santa Rosa de Lima\n💰 $ 10.000" in r.json()["textos"]["facebook"]
+    assert "link en el perfil" in r.json()["textos"]["instagram"]
+    img = encargada.get(f"{kit}/imagen.jpg")
+    assert Image.open(io.BytesIO(img.content)).size == (1080, 1080)
+    assert otro.get(kit).status_code == 404
+    # Publicar en las redes del sitio sigue siendo solo del administrador.
+    redes = f"/api/v1/admin/redes/tiendas/uniformes/grupos/{colegio['slug']}"
+    assert encargada.get(f"{redes}/productos/remera").status_code == 403

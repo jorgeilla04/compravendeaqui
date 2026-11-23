@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { EstadoPublicacion } from "@/components/redes/estado-publicacion";
+import { KitRedes } from "@/components/redes/kit-redes";
 import { PublicarEnRedes } from "@/components/redes/publicar-en-redes";
 import { PublicarProductoEnRedes } from "@/components/redes/publicar-producto";
 import type { GrupoDetalle } from "@/lib/tiendas/types";
@@ -210,5 +211,35 @@ describe("Eliminar una publicación", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: /Eliminar/ })).toBeNull();
+  });
+});
+
+describe("Kit para tus redes (tiendas)", () => {
+  it("muestra imagen y texto, y copia el texto para la red elegida", async () => {
+    const user = userEvent.setup();
+    const path =
+      "/admin/tiendas/uniformes/grupos/colegio-san-pablo/productos/remera/kit";
+    mockApi({
+      [`GET ${path}`]: () => ({
+        status: 200,
+        json: {
+          textos: {
+            facebook: "Remera\n👉 https://x",
+            instagram: "Remera\n👉 link en el perfil",
+          },
+          url: "https://x",
+        },
+      }),
+    });
+    render(<KitRedes path={path} archivo="remera" />);
+    expect(await screen.findByAltText("Imagen para publicar")).toHaveAttribute(
+      "src",
+      expect.stringContaining(`${path}/imagen.jpg`),
+    );
+    expect(screen.getByText(/link en el perfil/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Texto Facebook" }));
+    await user.click(screen.getByRole("button", { name: "Copiar texto" }));
+    expect(await navigator.clipboard.readText()).toBe("Remera\n👉 https://x");
+    expect(screen.getByRole("button", { name: "Copiado" })).toBeVisible();
   });
 });

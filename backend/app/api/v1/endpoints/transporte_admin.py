@@ -24,6 +24,7 @@ from app.models import (
     Transportista,
     User,
 )
+from app.schemas.redes import KitRedesOut
 from app.schemas.tiendas import TiendaResumenOut
 from app.schemas.transporte import (
     ConsultaAdminOut,
@@ -41,7 +42,7 @@ from app.schemas.transporte import (
     TransportistaConfigIn,
     UnidadIn,
 )
-from app.services import paquetes
+from app.services import paquetes, redes
 from app.services import tiendas as imagenes
 from app.services import transporte as service
 
@@ -531,3 +532,35 @@ def estado_consulta(
     db.commit()
     db.refresh(consulta)
     return ConsultaAdminOut.model_validate(consulta)
+
+
+# --- Kit para redes: el transportista publica en sus propias redes --------------
+
+KIT = "/{slug}/paquetes/{paquete_slug}/kit"
+
+
+@router.get(KIT, response_model=KitRedesOut)
+def kit_paquete(
+    slug: str, paquete_slug: str, user: CompleteUser, db: DbSession
+) -> KitRedesOut:
+    pieza = redes.pieza_de_paquete(
+        _paquete(db, _transportista(db, user, slug), paquete_slug)
+    )
+    return KitRedesOut(
+        textos={red: redes.texto_de(pieza, red) for red in redes.REDES},
+        url=pieza.url,
+    )
+
+
+@router.get(KIT + "/imagen.jpg")
+def kit_paquete_imagen(
+    slug: str, paquete_slug: str, user: CompleteUser, db: DbSession
+) -> Response:
+    pieza = redes.pieza_de_paquete(
+        _paquete(db, _transportista(db, user, slug), paquete_slug)
+    )
+    return Response(
+        redes.componer(pieza),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, no-store"},
+    )

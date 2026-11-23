@@ -895,6 +895,14 @@ describe("administración de tiendas", () => {
         json: catalogo,
       }),
       "GET /admin/tiendas/uniformes/pedidos": () => ({ status: 200, json: [] }),
+      "GET /admin/tiendas/uniformes/grupos/santa-rosa/productos/remera/kit":
+        () => ({
+          status: 200,
+          json: {
+            textos: { facebook: "Remera", instagram: "Remera" },
+            url: "x",
+          },
+        }),
       [`GET ${redes}/remera`]: () => ({
         status: 200,
         json: {
@@ -998,10 +1006,20 @@ describe("administración de tiendas", () => {
     expect(
       within(ventana).getByRole("tab", { name: "Datos y fotos" }),
     ).toHaveAttribute("aria-selected", "true");
-    // Publicar en las redes del sitio es solo para administradores del sitio.
+    // La encargada tiene el kit para sus redes, pero no publica en las del
+    // sitio (eso es solo del administrador).
+    await user.click(within(ventana).getByRole("tab", { name: "Redes" }));
     expect(
-      within(ventana).queryByRole("tab", { name: "Redes" }),
+      await within(ventana).findByRole("heading", {
+        name: "Kit para tus redes",
+      }),
+    ).toBeVisible();
+    expect(
+      within(ventana).queryByRole("heading", { name: "Publicar en redes" }),
     ).not.toBeInTheDocument();
+    await user.click(
+      within(ventana).getByRole("tab", { name: "Datos y fotos" }),
+    );
 
     const archivo = new File(["x"], "uniforme.png", { type: "image/png" });
     await user.upload(within(ventana).getByLabelText("Agregar foto"), archivo);
