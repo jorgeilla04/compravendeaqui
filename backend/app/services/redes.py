@@ -437,13 +437,18 @@ def crear_publicaciones(
     return filas
 
 
-def _post_existe(post_id: str) -> bool:
-    """Confirma con Meta si el post sigue publicado."""
+POST_INEXISTENTE = 100  # código de Meta: el objeto no existe
+
+
+def _post_borrado(post_id: str) -> bool:
+    """True solo si Meta confirma que el post no existe. Cualquier otra
+    respuesta (sigue publicado, sin conexión, token vencido) cuenta como que
+    no está borrado: ante la duda, no se marca."""
     try:
         _meta("GET", post_id, {"fields": "id"})
-    except MetaError:
-        return False
-    return True
+    except MetaError as exc:
+        return exc.codigo == POST_INEXISTENTE
+    return False
 
 
 def eliminar(db: Session, fila: PublicacionRed) -> None:
@@ -470,7 +475,7 @@ def eliminar(db: Session, fila: PublicacionRed) -> None:
         except MetaError as exc:
             # Si el borrado falla pero el post ya no existe (lo borraron desde
             # Facebook), está bien. Si sigue publicado, no se marca nada.
-            if _post_existe(fila.post_id):
+            if not _post_borrado(fila.post_id):
                 raise HTTPException(
                     status.HTTP_502_BAD_GATEWAY,
                     detail=f"Facebook no la dejó borrar: {exc}",
@@ -487,10 +492,11 @@ def eliminar(db: Session, fila: PublicacionRed) -> None:
     key = storage.key_from_url(fila.imagen_url, "redes/")
     if key and en_uso is None:
         try:
-            storage.delete_objects([key])
-        except storage.StorageError as exc:
-            log.warning("redes.imagen_no_borrada", key=key, error=str(exc))
-        fila.imagen_url = None
+            storage.delete_objects([key], raise_on_error=True)
+        except storage.StorageError:
+            pass  # queda la URL guardada para limpiarla más adelante
+        else:
+            fila.imagen_url = None
     fila.estado, fila.permalink = "eliminada", None
     db.commit()
     log.info("redes.eliminada", id=str(fila.id), red=fila.red, post=fila.post_id)

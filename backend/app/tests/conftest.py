@@ -183,7 +183,7 @@ def fake_storage(monkeypatch: pytest.MonkeyPatch) -> dict[str, bytes]:
         objects[key] = data
         return storage.public_url(key)
 
-    def delete_objects(keys: list[str]) -> None:
+    def delete_objects(keys: list[str], *, raise_on_error: bool = False) -> None:
         for key in keys:
             objects.pop(key, None)
 
