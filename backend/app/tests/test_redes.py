@@ -1,4 +1,4 @@
-"""Publicar avisos en Facebook e Instagram con la API de Meta (simulada)."""
+"""Publicar avisos y uniformes en Facebook e Instagram (API de Meta simulada)."""
 
 from __future__ import annotations
 
@@ -11,10 +11,11 @@ import pytest
 import respx
 from fastapi.testclient import TestClient
 from PIL import Image
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from app.config import settings
 from app.models import User
+from app.models.tiendas import Producto
 from app.services import redes
 from app.tests.conftest import create_listing, jpeg_bytes
 
@@ -135,3 +136,59 @@ def test_error_de_meta_y_reintento(
     )
     r = admin.post(f"{API}/{fila['id']}/reintentar")
     assert r.json()["estado"] == "publicada"
+
+
+# --- Productos de tiendas (uniformes por colegio) ------------------------------
+
+
+@pytest.fixture
+def remera_del_colegio(admin: TestClient, db: Any) -> str:
+    r = admin.post(
+        "/api/v1/admin/tiendas/uniformes/grupos",
+        json={
+            "nombre": "Colegio San Pablo",
+            "subtitulo": "Capital",
+            "color1": "#a3391e",
+            "color2": "#ffffff",
+        },
+    )
+    assert r.status_code == 201, r.text
+    # La remera: talles chicos a $ 23.000, grandes a $ 31.000, y 5XL consultar.
+    remera = db.scalars(select(Producto).where(Producto.slug == "remera")).one()
+    chicos, grandes = remera.opciones[:2], remera.opciones[2:-1]
+    remera.tramos = [
+        {"talles": chicos, "precio": 23000},
+        {"talles": grandes, "precio": 31000},
+        {"talles": remera.opciones[-1:], "precio": None},
+    ]
+    db.commit()
+    return f"{API}/tiendas/uniformes/grupos/{r.json()['slug']}/productos/remera"
+
+
+def test_publica_un_uniforme_del_colegio(
+    admin: TestClient, remera_del_colegio: str, meta: respx.MockRouter
+) -> None:
+    url = remera_del_colegio
+    data = admin.get(url).json()
+    texto = data["textos"]["facebook"]
+    assert "· Colegio San Pablo\n💰 Desde $ 23.000\n" in texto
+    assert ": $ 31.000\n" in texto
+    assert ": consultar\n" in texto
+    assert "/tiendas/uniformes/colegio-san-pablo?utm_source=facebook" in texto
+    assert "#ColegioSanPablo" in texto
+
+    img = admin.get(f"{url}/imagen.jpg")
+    assert Image.open(io.BytesIO(img.content)).size == (1080, 1080)
+
+    r = admin.post(url, json={"redes": ["facebook"]})
+    assert r.status_code == 202, r.text
+    (fila,) = admin.get(url).json()["publicaciones"]
+    assert fila["estado"] == "publicada"
+    assert fila["listing_id"] is None
+
+    (historial,) = admin.get(API).json()
+    assert historial["aviso_titulo"].endswith("· Colegio San Pablo")
+    assert historial["aviso_url"] == "/tiendas/uniformes/colegio-san-pablo"
+
+    sin_producto = url.replace("/remera", "/no-existe")
+    assert admin.get(sin_producto).status_code == 404

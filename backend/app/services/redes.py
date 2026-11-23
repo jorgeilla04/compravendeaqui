@@ -1,6 +1,7 @@
-"""Publicar avisos en redes sociales: arma la imagen (JPG 1080×1080, la que
-acepta Instagram) y el texto, y publica en la página de Facebook y en la
-cuenta de Instagram profesional vinculada, con la API de Meta.
+"""Publicar avisos y productos de tiendas (uniformes) en redes sociales: arma
+la imagen (JPG 1080×1080, la que acepta Instagram) y el texto, y publica en la
+página de Facebook y en la cuenta de Instagram profesional vinculada, con la
+API de Meta.
 
 Sin el token de la página configurado, la vista previa funciona igual y la
 publicación se rechaza con un mensaje claro.
@@ -12,6 +13,7 @@ import io
 import time
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -27,7 +29,9 @@ from app.config import settings
 from app.core.logging import get_logger
 from app.database import SessionLocal
 from app.models import Listing, PublicacionRed, User
+from app.models.tiendas import Grupo, Producto, Tienda
 from app.services import storage
+from app.services import tiendas as tiendas_service
 from app.services.listings import public_url
 
 log = get_logger(__name__)
@@ -50,13 +54,31 @@ def configurada(red: str) -> bool:
     return settings.instagram_configured
 
 
-# --- Texto --------------------------------------------------------------------
+# --- Qué se publica -------------------------------------------------------------
+
+
+@dataclass
+class Pieza:
+    """Lo que se publica, venga de un aviso o de un producto de una tienda."""
+
+    titulo: str
+    precio: str
+    url: str
+    etiqueta: str | None = None  # la "pastilla" sobre la foto
+    detalles: list[str] = field(default_factory=list)  # líneas con emoji
+    hashtags: list[str] = field(default_factory=list)
+    foto: Callable[[], Image.Image | None] = lambda: None
+    carpeta: str = "otros"  # dónde se guarda la imagen en el bucket
+
+
+def _pesos(valor: Decimal) -> str:
+    return f"{int(Decimal(valor)):,}".replace(",", ".")
 
 
 def precio_texto(listing: Listing) -> str:
     if listing.price is None:
         return "Consultar precio"
-    numero = f"{int(Decimal(listing.price)):,}".replace(",", ".")
+    numero = _pesos(listing.price)
     return f"US$ {numero}" if listing.price_currency == "USD" else f"$ {numero}"
 
 
@@ -65,26 +87,90 @@ def _hashtag(texto: str) -> str:
     return "#" + "".join(c for c in limpio if c.isalnum())
 
 
-def texto_para(listing: Listing, red: str) -> str:
-    """Texto de la publicación: en Instagram los links no se pueden tocar, así
-    que se indica dónde buscarlo."""
-    lineas = [listing.title, f"💰 {precio_texto(listing)}"]
+def pieza_de_aviso(listing: Listing) -> Pieza:
+    detalles = []
     lugar = listing.department or listing.location
     if lugar:
-        lineas.append(f"📍 {lugar}, San Juan")
+        detalles.append(f"📍 {lugar}, San Juan")
     if listing.condition in CONDICION:
-        lineas.append(f"✔️ {CONDICION[listing.condition]}")
-    url = (
-        f"{public_url(listing)}?utm_source={red}&utm_medium=social"
-        "&utm_campaign=redes"
+        detalles.append(f"✔️ {CONDICION[listing.condition]}")
+    return Pieza(
+        titulo=listing.title,
+        precio=precio_texto(listing),
+        url=public_url(listing),
+        etiqueta=CONDICION.get(listing.condition or ""),
+        detalles=detalles,
+        hashtags=[_hashtag(listing.category.name)],
+        foto=lambda: _foto(listing),
+        carpeta=str(listing.id),
     )
-    lineas.append("")
+
+
+def _rango_talles(talles: list[str]) -> str:
+    return talles[0] if len(talles) == 1 else f"{talles[0]} al {talles[-1]}"
+
+
+def pieza_de_producto(tienda: Tienda, grupo: Grupo, pp: Any) -> Pieza:
+    """Un producto de una tienda en un grupo (ej.: la remera de un colegio).
+    `pp` es el ProductoPrecio con el precio y la foto de ese grupo."""
+    producto: Producto = pp.producto
+    desde = pp.precio_desde
+    precios = {pp.precio_de(o) for o in producto.opciones} - {None}
+    if desde is None:
+        precio = "Consultar precio"
+    elif len(precios) > 1:
+        precio = f"Desde $ {_pesos(desde)}"
+    else:
+        precio = f"$ {_pesos(desde)}"
+    detalles = []
+    # Talles por tramo de precio: "Talles 4 al 16: $ 23.000".
+    if len(precios) > 1:
+        por_precio: dict[Decimal, list[str]] = {}
+        for talle in producto.opciones:
+            valor = pp.precio_de(talle)
+            if valor is not None:
+                por_precio.setdefault(valor, []).append(talle)
+        for valor, talles in sorted(por_precio.items()):
+            detalles.append(f"📏 Talles {_rango_talles(talles)}: $ {_pesos(valor)}")
+        consultar = [t for t in producto.opciones if pp.precio_de(t) is None]
+        if consultar:
+            detalles.append(f"📏 Talles {_rango_talles(consultar)}: consultar")
+    elif producto.opciones:
+        detalles.append(
+            f"📏 {tienda.opcion_label} {_rango_talles(list(producto.opciones))}"
+        )
+    if tienda.envio_habilitado:
+        detalles.append("🚚 Envío a tu casa en San Juan")
+    if tienda.sena_habilitada:
+        detalles.append(f"✅ Reservás con una seña del {tienda.sena_pct}%")
+    base = settings.public_site_url.rstrip("/")
+    return Pieza(
+        titulo=f"{producto.nombre} · {grupo.nombre}",
+        precio=precio,
+        url=f"{base}/tiendas/{tienda.slug}/{grupo.slug}",
+        etiqueta=tienda.nombre if len(tienda.nombre) <= 24 else None,
+        detalles=detalles,
+        hashtags=[_hashtag(tienda.nombre), _hashtag(grupo.nombre)],
+        foto=lambda: _foto_tienda(pp.foto_url) or _foto_tienda(grupo.logo_url),
+        carpeta=f"tiendas/{tienda.slug}/{grupo.slug}",
+    )
+
+
+def texto_de(pieza: Pieza, red: str) -> str:
+    """Texto de la publicación: en Instagram los links no se pueden tocar, así
+    que se indica dónde buscarlo."""
+    lineas = [pieza.titulo, f"💰 {pieza.precio}", *pieza.detalles, ""]
     if red == "instagram":
         lineas.append("👉 Consultalo en compravendeaqui.com.ar (link en el perfil)")
     else:
+        url = f"{pieza.url}?utm_source={red}&utm_medium=social&utm_campaign=redes"
         lineas.append(f"👉 Consultá y comprá acá: {url}")
-    lineas += ["", f"#SanJuan #CompraVendeAqui {_hashtag(listing.category.name)}"]
+    lineas += ["", " ".join(["#SanJuan", "#CompraVendeAqui", *pieza.hashtags])]
     return "\n".join(lineas)
+
+
+def texto_para(listing: Listing, red: str) -> str:
+    return texto_de(pieza_de_aviso(listing), red)
 
 
 # --- Imagen -------------------------------------------------------------------
@@ -109,6 +195,19 @@ def _foto(listing: Listing) -> Image.Image | None:
         return ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
     except (storage.StorageError, httpx.HTTPError, OSError) as exc:
         log.warning("redes.foto_no_disponible", listing=str(listing.id), error=str(exc))
+        return None
+
+
+def _foto_tienda(url: str | None) -> Image.Image | None:
+    """Foto de un producto o logo de una tienda: solo de nuestro bucket."""
+    key = storage.key_from_url(url, "tiendas/")
+    if key is None:
+        return None
+    try:
+        data = storage.get_object(key)
+        return ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
+    except (storage.StorageError, OSError) as exc:
+        log.warning("redes.foto_no_disponible", key=key, error=str(exc))
         return None
 
 
@@ -155,11 +254,15 @@ def _pin(draw: ImageDraw.ImageDraw, x: float, y: float, alto: float) -> None:
 
 
 def componer_imagen(listing: Listing) -> bytes:
+    return componer(pieza_de_aviso(listing))
+
+
+def componer(pieza: Pieza) -> bytes:
     """JPG 1080×1080: la foto arriba y una franja con precio, título y marca."""
     lienzo = Image.new("RGB", (LADO, LADO), "#ffffff")
     draw = ImageDraw.Draw(lienzo)
     franja = 330
-    foto = _foto(listing)
+    foto = pieza.foto()
     if foto is not None:
         caja = (LADO - 100, LADO - franja - 90)
         foto.thumbnail(caja, Image.Resampling.LANCZOS)
@@ -170,8 +273,8 @@ def componer_imagen(listing: Listing) -> bytes:
         draw.rectangle([0, 0, LADO, LADO - franja], fill=CLARO)
         _pin(draw, LADO / 2 - 80, (LADO - franja) / 2 - 110, 220)
 
-    if listing.condition in CONDICION:
-        etiqueta = CONDICION[listing.condition]
+    if pieza.etiqueta:
+        etiqueta = pieza.etiqueta
         fuente = _fuente("NunitoSans.ttf", 34, "Bold")
         ancho = draw.textlength(etiqueta, font=fuente) + 44
         draw.rounded_rectangle([40, 36, 40 + ancho, 96], radius=30, fill=AZUL)
@@ -181,12 +284,12 @@ def componer_imagen(listing: Listing) -> bytes:
     draw.rectangle([0, y0, LADO, LADO], fill=AZUL)
     draw.text(
         (60, y0 + 34),
-        precio_texto(listing),
-        font=_fuente("Rubik.ttf", 88, "Bold"),
+        pieza.precio,
+        font=_fuente("Rubik.ttf", 88 if len(pieza.precio) <= 14 else 72, "Bold"),
         fill=OCRE,
     )
     titulo = _fuente("NunitoSans.ttf", 42, "SemiBold")
-    for i, linea in enumerate(_lineas(draw, listing.title, titulo, LADO - 120)):
+    for i, linea in enumerate(_lineas(draw, pieza.titulo, titulo, LADO - 120)):
         draw.text((60, y0 + 148 + i * 54), linea, font=titulo, fill=CLARO)
     marca = _fuente("Rubik.ttf", 34, "ExtraBold")
     texto_marca, resto = "CompraVende", "Aqui"
@@ -276,13 +379,25 @@ def get_listing(db: Session, listing_id: uuid.UUID) -> Listing:
     return listing
 
 
+def get_producto_de_grupo(
+    db: Session, tienda_slug: str, grupo_slug: str, producto_slug: str
+) -> tuple[Tienda, Grupo, Any]:
+    """El producto tal como se vende en ese grupo (precio y foto del grupo)."""
+    tienda = tiendas_service.get_tienda(db, tienda_slug)
+    grupo = tiendas_service.get_grupo(db, tienda, grupo_slug)
+    for pp in tiendas_service.productos_de(db, tienda, grupo):
+        if pp.producto.slug == producto_slug:
+            return tienda, grupo, pp
+    raise HTTPException(
+        status.HTTP_404_NOT_FOUND,
+        detail=f"Ese producto no se vende en {grupo.nombre}",
+    )
+
+
 def crear_publicaciones(
-    db: Session, listing: Listing, redes: list[str], user: User
+    db: Session, pieza: Pieza, redes: list[str], user: User, **destino: Any
 ) -> list[PublicacionRed]:
-    if listing.status != "active":
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, detail="Solo se publican avisos activos"
-        )
+    """`destino`: listing_id, o producto_id y grupo_id."""
     faltan = [r for r in redes if not configurada(r)]
     if faltan:
         raise HTTPException(
@@ -290,17 +405,17 @@ def crear_publicaciones(
             detail=f"Falta conectar {', '.join(r.capitalize() for r in faltan)}",
         )
     imagen_url = storage.put_object(
-        f"redes/{listing.id}/{uuid.uuid4().hex}.jpg",
-        componer_imagen(listing),
-        "image/jpeg",
+        f"redes/{pieza.carpeta}/{uuid.uuid4().hex}.jpg", componer(pieza), "image/jpeg"
     )
     ahora = datetime.now(UTC)
     filas = [
         PublicacionRed(
-            listing_id=listing.id,
+            **destino,
+            titulo=pieza.titulo[:200],
+            url=pieza.url,
             red=red,
             estado="pendiente",
-            texto=texto_para(listing, red),
+            texto=texto_de(pieza, red),
             imagen_url=imagen_url,
             creada_por=user.id,
             created_at=ahora,

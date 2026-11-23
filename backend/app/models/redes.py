@@ -1,4 +1,5 @@
-"""Publicaciones de avisos en redes sociales (Facebook e Instagram)."""
+"""Publicaciones en redes sociales (Facebook e Instagram): de un aviso o de un
+producto de una tienda en un grupo (ej.: la remera de un colegio)."""
 
 from __future__ import annotations
 
@@ -15,9 +16,18 @@ from app.models.listing import Listing
 class PublicacionRed(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "publicaciones_redes"
 
-    listing_id: Mapped[uuid.UUID] = mapped_column(
+    listing_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("listings.id", ondelete="CASCADE"), index=True
     )
+    producto_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("tienda_productos.id", ondelete="CASCADE")
+    )
+    grupo_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("tienda_grupos.id", ondelete="CASCADE"), index=True
+    )
+    # Lo publicado, para el historial (el aviso o el producto pueden cambiar).
+    titulo: Mapped[str | None] = mapped_column(String(200))
+    url: Mapped[str | None] = mapped_column(Text)
     red: Mapped[str] = mapped_column(String(20))  # facebook | instagram
     # pendiente | publicada | error
     estado: Mapped[str] = mapped_column(String(20), default="pendiente")
@@ -32,4 +42,4 @@ class PublicacionRed(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     publicada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    listing: Mapped[Listing] = relationship(lazy="joined")
+    listing: Mapped[Listing | None] = relationship(lazy="joined")

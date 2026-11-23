@@ -38,8 +38,9 @@ export function HistorialRedes() {
       <div className="flex flex-col gap-2">
         <h1 className="font-heading text-h1 font-semibold">Redes sociales</h1>
         <p className="max-w-prose text-muted-foreground">
-          Para publicar una oferta, abrí el aviso y usá &quot;Publicar en
-          redes&quot;. Acá ves todo lo publicado.
+          Para publicar una oferta, abrí el aviso (o la página de un colegio,
+          para los uniformes) y usá &quot;Publicar en redes&quot;. Acá ves todo
+          lo publicado.
         </p>
         {estado ? (
           <p className="text-meta">
