@@ -80,17 +80,23 @@ def get_object(key: str) -> bytes:
         raise StorageError("No se pudo leer la imagen") from exc
 
 
-def delete_objects(keys: list[str]) -> None:
+def delete_objects(keys: list[str], *, raise_on_error: bool = False) -> None:
+    """Borra objetos del bucket. Por defecto un fallo no bloquea la operación
+    del usuario (queda en el log); con raise_on_error lanza StorageError."""
     if not keys:
         return
     try:
-        _client().delete_objects(
+        respuesta = _client().delete_objects(
             Bucket=settings.s3_bucket,
             Delete={"Objects": [{"Key": k} for k in keys], "Quiet": True},
         )
+        errores = respuesta.get("Errors") or []
     except (BotoCoreError, ClientError) as exc:
-        # No bloquea la operación del usuario: queda en el log para limpiar.
-        log.warning("storage.delete_failed", keys=keys, error=str(exc))
+        errores = [{"Message": str(exc)}]
+    if errores:
+        log.warning("storage.delete_failed", keys=keys, error=str(errores))
+        if raise_on_error:
+            raise StorageError("No se pudo borrar la imagen")
 
 
 def ensure_bucket(public_read: bool = True) -> None:

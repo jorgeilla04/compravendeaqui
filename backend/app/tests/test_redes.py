@@ -275,3 +275,41 @@ def test_si_facebook_no_deja_borrar_no_se_marca_eliminada(
     (sigue,) = admin.get(f"{API}/avisos/{aviso['id']}").json()["publicaciones"]
     assert sigue["estado"] == "publicada"
     assert sigue["permalink"]
+
+
+def test_si_no_se_puede_confirmar_el_borrado_no_se_marca(
+    admin: TestClient, aviso: dict[str, Any], meta: respx.MockRouter
+) -> None:
+    meta.delete(f"{GRAPH}/111_9").mock(side_effect=httpx.ConnectError("caído"))
+    meta.get(f"{GRAPH}/111_9").mock(
+        return_value=httpx.Response(
+            400, json={"error": {"code": 190, "message": "Token vencido"}}
+        )
+    )
+    admin.post(f"{API}/avisos/{aviso['id']}", json={"redes": ["facebook"]})
+    (fila,) = admin.get(f"{API}/avisos/{aviso['id']}").json()["publicaciones"]
+    assert admin.delete(f"{API}/{fila['id']}").status_code == 502
+    (sigue,) = admin.get(f"{API}/avisos/{aviso['id']}").json()["publicaciones"]
+    assert sigue["estado"] == "publicada"
+    assert sigue["imagen_url"]
+
+
+def test_si_falla_borrar_la_imagen_se_guarda_la_url(
+    admin: TestClient,
+    aviso: dict[str, Any],
+    meta: respx.MockRouter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    meta.delete(f"{GRAPH}/111_9").mock(
+        return_value=httpx.Response(200, json={"success": True})
+    )
+
+    def falla(keys: list[str], *, raise_on_error: bool = False) -> None:
+        raise redes.storage.StorageError("bucket caído")
+
+    admin.post(f"{API}/avisos/{aviso['id']}", json={"redes": ["facebook"]})
+    (fila,) = admin.get(f"{API}/avisos/{aviso['id']}").json()["publicaciones"]
+    monkeypatch.setattr(redes.storage, "delete_objects", falla)
+    r = admin.delete(f"{API}/{fila['id']}").json()
+    assert r["estado"] == "eliminada"
+    assert r["imagen_url"]  # para limpiarla más adelante
