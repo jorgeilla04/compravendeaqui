@@ -4,6 +4,7 @@ publicaciones (API de Meta simulada)."""
 from __future__ import annotations
 
 import io
+import uuid
 from collections.abc import Callable, Iterator
 from datetime import datetime, timedelta
 from typing import Any
@@ -16,7 +17,7 @@ from PIL import Image
 from sqlalchemy import select, update
 
 from app.config import settings
-from app.models import User
+from app.models import Listing, User
 from app.models.tiendas import Producto
 from app.services import calendario, redes
 from app.tests.conftest import create_listing, jpeg_bytes
@@ -322,6 +323,12 @@ def test_si_falla_borrar_la_imagen_se_guarda_la_url(
 CAL = f"{API}/calendario"
 
 
+def _hora(iso: str) -> str:
+    """Hora de San Juan de una fecha ISO (la base puede devolverla en UTC)."""
+    dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    return dt.astimezone(calendario.TZ).strftime("%H:%M")
+
+
 def _manana() -> str:
     return (calendario.hoy() + timedelta(days=1)).isoformat()
 
@@ -350,7 +357,7 @@ def test_hasta_tres_por_dia_con_horarios_fijos(
     assert r.status_code == 201, r.text
     uno = r.json()
     assert uno["tipo"] == "uniforme"
-    assert uno["publicar_at"].startswith(f"{dia}T19:00:00")
+    assert _hora(uno["publicar_at"]) == "19:00"
     assert uno["vista_previa"].endswith("/productos/remera/imagen.jpg")
 
     # El mismo producto dos veces el mismo día, no.
@@ -360,7 +367,7 @@ def test_hasta_tres_por_dia_con_horarios_fijos(
         CAL, json={"fecha": dia, "listing_id": aviso["id"], "redes": ["facebook"]}
     )
     admin.post(CAL, json=_prenda(fecha=dia, producto="campera"))
-    horas = [p["publicar_at"][11:16] for p in admin.get(CAL).json()]
+    horas = [_hora(p["publicar_at"]) for p in admin.get(CAL).json()]
     assert horas == ["10:00", "14:00", "19:00"]
 
     cuarto = admin.post(CAL, json=_prenda(fecha=dia, producto="buzo"))
@@ -369,7 +376,7 @@ def test_hasta_tres_por_dia_con_horarios_fijos(
 
     # Al quitar una, las demás se reacomodan (12 y 19 h).
     assert admin.delete(f"{CAL}/{uno['id']}").status_code == 204
-    horas = [p["publicar_at"][11:16] for p in admin.get(CAL).json()]
+    horas = [_hora(p["publicar_at"]) for p in admin.get(CAL).json()]
     assert horas == ["12:00", "19:00"]
 
 
@@ -390,7 +397,7 @@ def test_publica_solo_lo_que_llego_su_hora(
 ) -> None:
     dia = _manana()
     prog = admin.post(CAL, json=_prenda(fecha=dia)).json()
-    hora = datetime.fromisoformat(prog["publicar_at"])
+    hora = datetime.fromisoformat(prog["publicar_at"].replace("Z", "+00:00"))
 
     assert calendario.publicar_vencidas(hora - timedelta(minutes=1)) == 0
     assert calendario.publicar_vencidas(hora + timedelta(minutes=1)) == 1
@@ -406,7 +413,9 @@ def test_si_paso_demasiado_tiempo_no_publica_fuera_de_hora(
     admin: TestClient, remera_del_colegio: str, meta: respx.MockRouter
 ) -> None:
     prog = admin.post(CAL, json=_prenda(fecha=_manana())).json()
-    tarde = datetime.fromisoformat(prog["publicar_at"]) + timedelta(hours=5)
+    tarde = datetime.fromisoformat(
+        prog["publicar_at"].replace("Z", "+00:00")
+    ) + timedelta(hours=5)
     assert calendario.publicar_vencidas(tarde) == 1
     (fila,) = admin.get(CAL).json()
     assert fila["estado"] == "error"
@@ -424,8 +433,35 @@ def test_error_de_facebook_queda_en_el_calendario(
     )
     prog = admin.post(CAL, json=_prenda(fecha=_manana())).json()
     calendario.publicar_vencidas(
-        datetime.fromisoformat(prog["publicar_at"]) + timedelta(minutes=1)
+        datetime.fromisoformat(prog["publicar_at"].replace("Z", "+00:00"))
+        + timedelta(minutes=1)
     )
     (fila,) = admin.get(CAL).json()
     assert fila["estado"] == "error"
     assert "token de acceso venció" in fila["error"]
+
+
+def test_aviso_editado_despues_de_programarlo_no_se_publica(
+    admin: TestClient,
+    aviso: dict[str, Any],
+    meta: respx.MockRouter,
+    make_user: MakeUser,
+    db: Any,
+) -> None:
+    prog = admin.post(
+        CAL,
+        json={"fecha": _manana(), "listing_id": aviso["id"], "redes": ["facebook"]},
+    ).json()
+    # El vendedor cambia el título después de que el admin lo programó.
+    db.execute(
+        update(Listing)
+        .where(Listing.id == uuid.UUID(aviso["id"]))
+        .values(title="Otro texto")
+    )
+    db.commit()
+    hora = datetime.fromisoformat(prog["publicar_at"].replace("Z", "+00:00"))
+    assert calendario.publicar_vencidas(hora + timedelta(minutes=1)) == 1
+    (fila,) = admin.get(CAL).json()
+    assert fila["estado"] == "error"
+    assert "cambió desde que lo programaste" in fila["error"]
+    assert not meta.calls

@@ -282,8 +282,5 @@ def programar(body: ProgramarIn, user: AdminUser, db: DbSession) -> Programacion
 
 @router.delete("/calendario/{programacion_id}", status_code=status.HTTP_204_NO_CONTENT)
 def desprogramar(programacion_id: uuid.UUID, _: AdminUser, db: DbSession) -> Response:
-    prog = db.get(ProgramacionRed, programacion_id)
-    if prog is None or prog.estado == "cancelada":
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No existe")
-    calendario.quitar(db, prog)
+    calendario.quitar(db, programacion_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

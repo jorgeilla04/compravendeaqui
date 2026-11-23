@@ -11,6 +11,7 @@ fuera de hora: queda con error para reprogramarlo.
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import UTC, date, datetime, time, timedelta, timezone
 from typing import Any
@@ -63,6 +64,23 @@ def _reacomodar(db: Session, fecha: date) -> None:
             prog.publicar_at = datetime.combine(fecha, time(horas[i]), tzinfo=TZ)
 
 
+def huella_aviso(listing: Listing) -> str:
+    """Huella de lo que se publica de un aviso: título, texto, precio, rubro,
+    lugar, estado y fotos. Cambia si el vendedor edita algo."""
+    fotos = sorted(f"{i.storage_key or i.url}:{i.is_primary}" for i in listing.images)
+    partes = [
+        listing.title,
+        listing.description,
+        str(listing.price),
+        listing.price_currency or "",
+        str(listing.category_id),
+        listing.department or "",
+        listing.condition or "",
+        *fotos,
+    ]
+    return hashlib.sha256("\x1f".join(partes).encode()).hexdigest()
+
+
 def _pieza(db: Session, prog: ProgramacionRed) -> redes.Pieza:
     """Lo que se va a publicar, con los datos de hoy (precio, foto)."""
     if prog.listing_id is not None:
@@ -71,6 +89,11 @@ def _pieza(db: Session, prog: ProgramacionRed) -> redes.Pieza:
             raise ValueError("El aviso ya no existe")
         if listing.status != "active":
             raise ValueError("El aviso ya no está activo")
+        if prog.huella != huella_aviso(listing):
+            raise ValueError(
+                "El aviso cambió desde que lo programaste: revisalo y "
+                "programalo de nuevo."
+            )
         return redes.pieza_de_aviso(listing)
     grupo = db.get(Grupo, prog.grupo_id)
     producto = db.get(Producto, prog.producto_id)
@@ -157,12 +180,14 @@ def agregar(
             )
         pieza = redes.pieza_de_aviso(listing)
         datos: dict[str, Any] = {"listing_id": listing.id}
+        huella: str | None = huella_aviso(listing)
     else:
         t, g, pp = redes.get_producto_de_grupo(
             db, tienda or "", grupo or "", producto or ""
         )
         pieza = redes.pieza_de_producto(t, g, pp)
         datos = {"producto_id": pp.producto.id, "grupo_id": g.id}
+        huella = None  # las prendas las maneja el sitio: precio y foto del día
 
     # Un día a la vez: dos pedidos simultáneos no pasan el tope de 3.
     db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": fecha.toordinal()})
@@ -181,6 +206,7 @@ def agregar(
         orden=len(del_dia) + 1,
         publicar_at=datetime.combine(fecha, time(19), tzinfo=TZ),
         titulo=pieza.titulo[:200],
+        huella=huella,
         redes=sorted(set(red_list)),
         estado="programada",
         creada_por=creada_por,
@@ -195,7 +221,16 @@ def agregar(
     return prog
 
 
-def quitar(db: Session, prog: ProgramacionRed) -> None:
+def quitar(db: Session, programacion_id: uuid.UUID) -> None:
+    """Saca una programación del calendario. Se bloquea la fila: si el
+    publicador ya la tomó (está "publicando"), no se puede sacar."""
+    prog = db.scalars(
+        select(ProgramacionRed)
+        .where(ProgramacionRed.id == programacion_id)
+        .with_for_update()
+    ).first()
+    if prog is None or prog.estado == "cancelada":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No existe")
     if prog.estado != "programada":
         raise HTTPException(
             status.HTTP_409_CONFLICT,

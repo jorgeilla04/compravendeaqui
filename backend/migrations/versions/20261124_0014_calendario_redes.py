@@ -39,6 +39,7 @@ def upgrade() -> None:
             sa.ForeignKey("tienda_grupos.id", ondelete="CASCADE"),
         ),
         sa.Column("titulo", sa.String(200), nullable=False),
+        sa.Column("huella", sa.String(64)),
         sa.Column("redes", sa.JSON(), nullable=False),
         sa.Column("estado", sa.String(20), nullable=False, index=True),
         sa.Column("error", sa.Text()),

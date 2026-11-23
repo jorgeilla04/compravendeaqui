@@ -68,6 +68,9 @@ class ProgramacionRed(UUIDPrimaryKeyMixin, Base):
         Uuid, ForeignKey("tienda_grupos.id", ondelete="CASCADE")
     )
     titulo: Mapped[str] = mapped_column(String(200))
+    # Avisos (los escribe cada vendedor): huella del contenido revisado al
+    # programar. Si cambió, no se publica sin volver a revisarlo.
+    huella: Mapped[str | None] = mapped_column(String(64))
     redes: Mapped[list[str]] = mapped_column(JSON)
     # programada | publicando | publicada | error | cancelada
     estado: Mapped[str] = mapped_column(String(20), default="programada", index=True)
