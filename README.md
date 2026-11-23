@@ -97,6 +97,8 @@ python -m app.scripts.setup_storage
 ```
 
 Tareas programadas (cron diario): `python -m app.scripts.expire_listings`
+
+Publicaciones del calendario de redes (cron cada minuto): `python -m app.scripts.publicar_programadas`
 marca como vencidos los avisos de más de 90 días.
 
 ### 4. Frontend
