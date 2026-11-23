@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PublicarProductoEnRedes } from "@/components/redes/publicar-producto";
 import { GrupoLogo } from "@/components/tiendas/grupo-logo";
 import { ProductoCard } from "@/components/tiendas/producto-card";
 import { serverGet } from "@/lib/api";
@@ -105,6 +106,9 @@ export default async function GrupoPage({ params }: Props) {
           ))}
         </ul>
       )}
+      {grupo.productos.length > 0 ? (
+        <PublicarProductoEnRedes tienda={tienda.slug} grupo={grupo} />
+      ) : null}
     </div>
   );
 }

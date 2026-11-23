@@ -20,7 +20,9 @@ class PublicacionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    listing_id: uuid.UUID
+    listing_id: uuid.UUID | None
+    producto_id: uuid.UUID | None
+    grupo_id: uuid.UUID | None
     red: str
     estado: str
     texto: str

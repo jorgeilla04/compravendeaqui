@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { PublicarEnRedes } from "@/components/redes/publicar-en-redes";
+import { PublicarProductoEnRedes } from "@/components/redes/publicar-producto";
+import type { GrupoDetalle } from "@/lib/tiendas/types";
 import { mockApi } from "@/test-utils/api-mock";
 
 let role = "admin";
@@ -90,5 +92,54 @@ describe("Publicar en redes", () => {
 
     await user.click(screen.getByRole("button", { name: "Texto Instagram" }));
     expect(screen.getByText(/link en el perfil/)).toBeVisible();
+  });
+});
+
+describe("Publicar uniformes de un colegio", () => {
+  const grupo = {
+    slug: "colegio-san-pablo",
+    nombre: "Colegio San Pablo",
+    productos: [
+      { slug: "remera", nombre: "Remera" },
+      { slug: "campera", nombre: "Campera" },
+    ],
+  } as unknown as GrupoDetalle;
+  const base = "/admin/redes/tiendas/uniformes/grupos/colegio-san-pablo";
+  const respuesta = () => ({
+    status: 200,
+    json: {
+      textos,
+      conectadas: { facebook: true, instagram: false },
+      publicaciones: [],
+    },
+  });
+
+  it("se elige la prenda y la vista previa es la de esa prenda", async () => {
+    const user = userEvent.setup();
+    mockApi({
+      [`GET ${base}/productos/remera`]: respuesta,
+      [`GET ${base}/productos/campera`]: respuesta,
+    });
+    render(<PublicarProductoEnRedes tienda="uniformes" grupo={grupo} />);
+    const img = await screen.findByAltText("Imagen que se va a publicar");
+    expect(img).toHaveAttribute(
+      "src",
+      expect.stringContaining(`${base}/productos/remera/imagen.jpg`),
+    );
+    await user.selectOptions(screen.getByLabelText("Prenda"), "campera");
+    expect(
+      await screen.findByAltText("Imagen que se va a publicar"),
+    ).toHaveAttribute(
+      "src",
+      expect.stringContaining(`${base}/productos/campera/imagen.jpg`),
+    );
+  });
+
+  it("no aparece para quien no es administrador", () => {
+    role = "user";
+    const { container } = render(
+      <PublicarProductoEnRedes tienda="uniformes" grupo={grupo} />,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });

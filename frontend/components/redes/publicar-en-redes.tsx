@@ -17,8 +17,19 @@ const ESPERA_MS = 3000;
 /**
  * "Publicar en redes" (solo administradores): vista previa de la imagen y el
  * texto, elegir Facebook y/o Instagram, y seguir el estado de cada post.
+ * Sirve para un aviso (`listingId`) o para cualquier ruta de la API de redes
+ * (`path`, ej.: un producto de un colegio); `selector` va arriba de la vista
+ * previa (ej.: elegir la prenda).
  */
-export function PublicarEnRedes({ listingId }: { listingId: string }) {
+export function PublicarEnRedes({
+  listingId,
+  path: ruta,
+  selector,
+}: {
+  listingId?: string;
+  path?: string;
+  selector?: React.ReactNode;
+}) {
   const esAdmin = useOptionalAuth()?.user?.role === "admin";
   const [datos, setDatos] = React.useState<AvisoRedes | null>(null);
   const [elegidas, setElegidas] = React.useState<Red[]>([]);
@@ -26,7 +37,7 @@ export function PublicarEnRedes({ listingId }: { listingId: string }) {
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [version, setVersion] = React.useState(0);
-  const path = `/admin/redes/avisos/${listingId}`;
+  const path = ruta ?? `/admin/redes/avisos/${listingId}`;
 
   const cargar = React.useCallback(
     () =>
@@ -43,7 +54,11 @@ export function PublicarEnRedes({ listingId }: { listingId: string }) {
   );
 
   React.useEffect(() => {
-    if (esAdmin) void cargar();
+    if (!esAdmin) return;
+    setDatos(null);
+    setError(null);
+    setElegidas([]);
+    void cargar();
   }, [esAdmin, cargar]);
 
   // Mientras haya publicaciones en curso, se consulta el estado.
@@ -95,6 +110,7 @@ export function PublicarEnRedes({ listingId }: { listingId: string }) {
           Historial
         </Link>
       </div>
+      {selector}
       {datos ? (
         <div className="grid gap-4 md:grid-cols-[minmax(0,18rem)_1fr]">
           {/* eslint-disable-next-line @next/next/no-img-element -- imagen armada por la API */}
@@ -177,10 +193,7 @@ export function PublicarEnRedes({ listingId }: { listingId: string }) {
         <p className="text-meta text-muted-foreground">Cargando…</p>
       )}
       {datos?.publicaciones.length ? (
-        <ul
-          className="flex flex-col gap-2"
-          aria-label="Publicaciones de este aviso"
-        >
+        <ul className="flex flex-col gap-2" aria-label="Ya publicado">
           {datos.publicaciones.map((p) => (
             <EstadoPublicacion
               key={p.id}

@@ -2,7 +2,9 @@ export type Red = "facebook" | "instagram";
 
 export interface Publicacion {
   id: string;
-  listing_id: string;
+  listing_id: string | null;
+  producto_id: string | null;
+  grupo_id: string | null;
   red: Red;
   estado: "pendiente" | "publicada" | "error";
   texto: string;
