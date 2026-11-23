@@ -87,7 +87,7 @@ def _clean_state() -> Iterator[None]:
                 "tienda_pedido_items, tienda_pedidos, tienda_precios, "
                 "tienda_grupos, tienda_admins, tienda_consultas, transporte_pedidos, "
                 "transporte_admins, paquete_consultas, paquete_reservas, "
-                "publicaciones_redes, paquete_salidas, paquetes "
+                "publicaciones_redes, programaciones_redes, paquete_salidas, paquetes "
                 "RESTART IDENTITY CASCADE"
             )
         )

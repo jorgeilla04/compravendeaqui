@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.logging import get_logger
 from app.database import SessionLocal
-from app.models import Listing, PublicacionRed, User
+from app.models import Listing, PublicacionRed
 from app.models.tiendas import Grupo, Producto, Tienda
 from app.services import storage
 from app.services import tiendas as tiendas_service
@@ -403,9 +403,14 @@ def get_producto_de_grupo(
 
 
 def crear_publicaciones(
-    db: Session, pieza: Pieza, redes: list[str], user: User, **destino: Any
+    db: Session,
+    pieza: Pieza,
+    redes: list[str],
+    creada_por: uuid.UUID | None,
+    **destino: Any,
 ) -> list[PublicacionRed]:
-    """`destino`: listing_id, o producto_id y grupo_id."""
+    """`destino`: listing_id, o producto_id y grupo_id (y programacion_id si
+    sale del calendario)."""
     faltan = [r for r in redes if not configurada(r)]
     if faltan:
         raise HTTPException(
@@ -425,7 +430,7 @@ def crear_publicaciones(
             estado="pendiente",
             texto=texto_de(pieza, red),
             imagen_url=imagen_url,
-            creada_por=user.id,
+            creada_por=creada_por,
             created_at=ahora,
         )
         for red in redes

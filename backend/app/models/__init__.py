@@ -5,7 +5,7 @@ from app.models.base import Base
 from app.models.category import Category
 from app.models.listing import Listing, ListingImage
 from app.models.moderation import ModerationLog
-from app.models.redes import PublicacionRed
+from app.models.redes import ProgramacionRed, PublicacionRed
 from app.models.tiendas import (
     Grupo,
     Pedido,
@@ -38,6 +38,7 @@ __all__ = [
     "ModerationLog",
     "OtpCode",
     "Paquete",
+    "ProgramacionRed",
     "PublicacionRed",
     "Pedido",
     "PedidoItem",

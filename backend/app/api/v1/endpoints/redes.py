@@ -4,20 +4,24 @@ la remera de un colegio). Solo administradores del sitio."""
 from __future__ import annotations
 
 import uuid
+from datetime import date, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Response, status
 from sqlalchemy import select
 
 from app.api.deps import AdminUser, DbSession
 from app.config import settings
-from app.models import Listing, PublicacionRed
+from app.models import Listing, ProgramacionRed, PublicacionRed
 from app.schemas.redes import (
     AvisoRedesOut,
+    ProgramacionOut,
+    ProgramarIn,
     PublicacionListadoOut,
     PublicacionOut,
     PublicarIn,
     RedesEstadoOut,
 )
+from app.services import calendario
 from app.services import redes as service
 from app.services.listings import url_path
 
@@ -121,7 +125,7 @@ def publicar(
         db,
         service.pieza_de_aviso(listing),
         sorted(set(body.redes)),
-        user,
+        user.id,
         listing_id=listing.id,
     )
     tareas.add_task(service.publicar_en_segundo_plano, [f.id for f in filas])
@@ -175,7 +179,7 @@ def publicar_producto(
         db,
         service.pieza_de_producto(t, g, pp),
         sorted(set(body.redes)),
-        user,
+        user.id,
         producto_id=pp.producto.id,
         grupo_id=g.id,
     )
@@ -213,3 +217,73 @@ def eliminar(publicacion_id: uuid.UUID, _: AdminUser, db: DbSession) -> Publicac
     service.eliminar(db, fila)
     db.refresh(fila)
     return PublicacionOut.model_validate(fila)
+
+
+# --- Calendario ----------------------------------------------------------------
+
+
+def _programaciones(
+    db: DbSession, progs: list[ProgramacionRed]
+) -> list[ProgramacionOut]:
+    pubs: dict[uuid.UUID, list[PublicacionOut]] = {}
+    for f in calendario.publicaciones_de(db, [p.id for p in progs]):
+        if f.programacion_id is not None:
+            pubs.setdefault(f.programacion_id, []).append(
+                PublicacionOut.model_validate(f)
+            )
+    return [
+        ProgramacionOut(
+            id=p.id,
+            fecha=p.fecha,
+            orden=p.orden,
+            publicar_at=p.publicar_at,
+            titulo=p.titulo,
+            redes=list(p.redes),
+            estado=p.estado,
+            error=p.error,
+            publicaciones=pubs.get(p.id, []),
+            **calendario.destino(db, p),
+        )
+        for p in progs
+    ]
+
+
+@router.get("/calendario", response_model=list[ProgramacionOut])
+def ver_calendario(
+    _: AdminUser,
+    db: DbSession,
+    desde: date | None = Query(default=None),
+    dias: int = Query(default=31, ge=1, le=62),
+) -> list[ProgramacionOut]:
+    inicio = desde or calendario.hoy()
+    return _programaciones(
+        db, calendario.listar(db, inicio, inicio + timedelta(days=dias - 1))
+    )
+
+
+@router.post(
+    "/calendario",
+    response_model=ProgramacionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def programar(body: ProgramarIn, user: AdminUser, db: DbSession) -> ProgramacionOut:
+    prog = calendario.agregar(
+        db,
+        body.fecha,
+        list(body.redes),
+        user.id,
+        listing_id=body.listing_id,
+        tienda=body.tienda,
+        grupo=body.grupo,
+        producto=body.producto,
+    )
+    return _programaciones(db, [prog])[0]
+
+
+@router.delete("/calendario/{programacion_id}", status_code=status.HTTP_204_NO_CONTENT)
+def desprogramar(programacion_id: uuid.UUID, _: AdminUser, db: DbSession) -> Response:
+    prog = db.get(ProgramacionRed, programacion_id)
+    if prog is None or prog.estado == "cancelada":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="No existe")
+    calendario.quitar(db, prog)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

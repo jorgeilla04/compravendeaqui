@@ -103,12 +103,20 @@ export function PublicarEnRedes({
           <Share2 aria-hidden="true" className="size-5 text-primary" />
           Publicar en redes
         </h2>
-        <Link
-          href="/admin/redes"
-          className="text-meta font-semibold text-primary underline-offset-4 hover:underline"
-        >
-          Historial
-        </Link>
+        <span className="flex gap-4">
+          <Link
+            href="/admin/redes/calendario"
+            className="text-meta font-semibold text-primary underline-offset-4 hover:underline"
+          >
+            Calendario
+          </Link>
+          <Link
+            href="/admin/redes"
+            className="text-meta font-semibold text-primary underline-offset-4 hover:underline"
+          >
+            Historial
+          </Link>
+        </span>
       </div>
       {selector}
       {datos ? (

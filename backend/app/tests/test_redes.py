@@ -1,9 +1,11 @@
-"""Publicar avisos y uniformes en Facebook e Instagram (API de Meta simulada)."""
+"""Publicar avisos y uniformes en Facebook e Instagram, y el calendario de
+publicaciones (API de Meta simulada)."""
 
 from __future__ import annotations
 
 import io
 from collections.abc import Callable, Iterator
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
@@ -16,7 +18,7 @@ from sqlalchemy import select, update
 from app.config import settings
 from app.models import User
 from app.models.tiendas import Producto
-from app.services import redes
+from app.services import calendario, redes
 from app.tests.conftest import create_listing, jpeg_bytes
 
 API = "/api/v1/admin/redes"
@@ -313,3 +315,117 @@ def test_si_falla_borrar_la_imagen_se_guarda_la_url(
     r = admin.delete(f"{API}/{fila['id']}").json()
     assert r["estado"] == "eliminada"
     assert r["imagen_url"]  # para limpiarla más adelante
+
+
+# --- Calendario ------------------------------------------------------------------
+
+CAL = f"{API}/calendario"
+
+
+def _manana() -> str:
+    return (calendario.hoy() + timedelta(days=1)).isoformat()
+
+
+def _prenda(**extra: Any) -> dict[str, Any]:
+    return {
+        "tienda": "uniformes",
+        "grupo": "colegio-san-pablo",
+        "producto": "remera",
+        "redes": ["facebook"],
+        **extra,
+    }
+
+
+def test_hasta_tres_por_dia_con_horarios_fijos(
+    admin: TestClient,
+    aviso: dict[str, Any],
+    remera_del_colegio: str,
+    meta: respx.MockRouter,
+    client: TestClient,
+) -> None:
+    dia = _manana()
+    assert client.post(CAL, json=_prenda(fecha=dia)).status_code == 401
+
+    r = admin.post(CAL, json=_prenda(fecha=dia))
+    assert r.status_code == 201, r.text
+    uno = r.json()
+    assert uno["tipo"] == "uniforme"
+    assert uno["publicar_at"].startswith(f"{dia}T19:00:00")
+    assert uno["vista_previa"].endswith("/productos/remera/imagen.jpg")
+
+    # El mismo producto dos veces el mismo día, no.
+    assert admin.post(CAL, json=_prenda(fecha=dia)).status_code == 409
+
+    admin.post(
+        CAL, json={"fecha": dia, "listing_id": aviso["id"], "redes": ["facebook"]}
+    )
+    admin.post(CAL, json=_prenda(fecha=dia, producto="campera"))
+    horas = [p["publicar_at"][11:16] for p in admin.get(CAL).json()]
+    assert horas == ["10:00", "14:00", "19:00"]
+
+    cuarto = admin.post(CAL, json=_prenda(fecha=dia, producto="buzo"))
+    assert cuarto.status_code == 409
+    assert "3 publicaciones" in cuarto.json()["detail"]
+
+    # Al quitar una, las demás se reacomodan (12 y 19 h).
+    assert admin.delete(f"{CAL}/{uno['id']}").status_code == 204
+    horas = [p["publicar_at"][11:16] for p in admin.get(CAL).json()]
+    assert horas == ["12:00", "19:00"]
+
+
+def test_valida_fecha_y_redes(
+    admin: TestClient, remera_del_colegio: str, meta: respx.MockRouter
+) -> None:
+    ayer = (calendario.hoy() - timedelta(days=1)).isoformat()
+    assert admin.post(CAL, json=_prenda(fecha=ayer)).status_code == 422
+    # Ni aviso ni prenda.
+    assert (
+        admin.post(CAL, json={"fecha": _manana(), "redes": ["facebook"]}).status_code
+        == 422
+    )
+
+
+def test_publica_solo_lo_que_llego_su_hora(
+    admin: TestClient, remera_del_colegio: str, meta: respx.MockRouter
+) -> None:
+    dia = _manana()
+    prog = admin.post(CAL, json=_prenda(fecha=dia)).json()
+    hora = datetime.fromisoformat(prog["publicar_at"])
+
+    assert calendario.publicar_vencidas(hora - timedelta(minutes=1)) == 0
+    assert calendario.publicar_vencidas(hora + timedelta(minutes=1)) == 1
+    (hecha,) = admin.get(CAL).json()
+    assert hecha["estado"] == "publicada"
+    assert hecha["publicaciones"][0]["permalink"] == "https://www.facebook.com/111_9"
+    # Ya publicada: no sale de nuevo ni se puede quitar del calendario.
+    assert calendario.publicar_vencidas(hora + timedelta(minutes=2)) == 0
+    assert admin.delete(f"{CAL}/{hecha['id']}").status_code == 409
+
+
+def test_si_paso_demasiado_tiempo_no_publica_fuera_de_hora(
+    admin: TestClient, remera_del_colegio: str, meta: respx.MockRouter
+) -> None:
+    prog = admin.post(CAL, json=_prenda(fecha=_manana())).json()
+    tarde = datetime.fromisoformat(prog["publicar_at"]) + timedelta(hours=5)
+    assert calendario.publicar_vencidas(tarde) == 1
+    (fila,) = admin.get(CAL).json()
+    assert fila["estado"] == "error"
+    assert "No salió a su hora" in fila["error"]
+    assert not meta.calls
+
+
+def test_error_de_facebook_queda_en_el_calendario(
+    admin: TestClient, remera_del_colegio: str, meta: respx.MockRouter
+) -> None:
+    meta.post(f"{GRAPH}/111/photos").mock(
+        return_value=httpx.Response(
+            400, json={"error": {"message": "El token de acceso venció"}}
+        )
+    )
+    prog = admin.post(CAL, json=_prenda(fecha=_manana())).json()
+    calendario.publicar_vencidas(
+        datetime.fromisoformat(prog["publicar_at"]) + timedelta(minutes=1)
+    )
+    (fila,) = admin.get(CAL).json()
+    assert fila["estado"] == "error"
+    assert "token de acceso venció" in fila["error"]

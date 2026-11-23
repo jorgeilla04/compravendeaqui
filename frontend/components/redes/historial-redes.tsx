@@ -1,5 +1,6 @@
 "use client";
 
+import { CalendarDays } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -36,7 +37,16 @@ export function HistorialRedes() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="font-heading text-h1 font-semibold">Redes sociales</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="font-heading text-h1 font-semibold">Redes sociales</h1>
+          <Link
+            href="/admin/redes/calendario"
+            className="inline-flex min-h-11 items-center gap-2 rounded-input border border-border bg-card px-4 font-semibold hover:border-primary hover:text-primary"
+          >
+            <CalendarDays aria-hidden="true" className="size-5" />
+            Calendario
+          </Link>
+        </div>
         <p className="max-w-prose text-muted-foreground">
           Para publicar una oferta, abrí el aviso (o la página de un colegio,
           para los uniformes) y usá &quot;Publicar en redes&quot;. Acá ves todo
