@@ -1,6 +1,13 @@
 "use client";
 
-import { LogOut, Settings, ShieldCheck, Store, User } from "lucide-react";
+import {
+  LogOut,
+  Settings,
+  Share2,
+  ShieldCheck,
+  Store,
+  User,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -49,6 +56,15 @@ export function AccountMenu() {
           >
             <Store aria-hidden="true" className="size-4" />
             Mis tiendas
+          </Link>
+        ) : null}
+        {user.role === "admin" ? (
+          <Link
+            href="/admin/redes"
+            className="inline-flex items-center gap-2 px-3 py-2.5 text-base hover:bg-muted"
+          >
+            <Share2 aria-hidden="true" className="size-4" />
+            Redes sociales
           </Link>
         ) : null}
         {puedeModerar(user.role) ? (

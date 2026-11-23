@@ -124,6 +124,14 @@ class Settings(BaseSettings):
     # Texto que ve el comprador en el resumen de la tarjeta (máx. 22).
     mp_statement_descriptor: str = "COMPRAVENDEAQUI"
 
+    # --- Redes sociales (Meta: página de Facebook e Instagram profesional) ---
+    # Token de página que no vence (se carga en el servidor, nunca en el repo).
+    meta_page_id: str = ""
+    meta_page_token: str = ""
+    # Cuenta de Instagram profesional vinculada a la página (opcional).
+    meta_ig_user_id: str = ""
+    meta_graph_url: str = "https://graph.facebook.com/v21.0"
+
     # --- Mapas (cotizador de transporte) ---
     # Sugerencias de lugares (Photon) y distancia por ruta (OSRM), ambos sobre
     # OpenStreetMap. Se consultan desde el backend: el navegador no habla con
@@ -205,6 +213,14 @@ class Settings(BaseSettings):
     @property
     def email_configured(self) -> bool:
         return bool(self.smtp_host and self.email_from)
+
+    @property
+    def facebook_configured(self) -> bool:
+        return bool(self.meta_page_id and self.meta_page_token)
+
+    @property
+    def instagram_configured(self) -> bool:
+        return self.facebook_configured and bool(self.meta_ig_user_id)
 
     @property
     def mp_configured(self) -> bool:

@@ -7,6 +7,7 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { ContactButton } from "@/components/listings/contact-button";
 import { Gallery } from "@/components/listings/gallery";
 import { ViewPing } from "@/components/listings/view-ping";
+import { PublicarEnRedes } from "@/components/redes/publicar-en-redes";
 import { Badge } from "@/components/ui/badge";
 import { serverGet } from "@/lib/api";
 import { SITE_NAME, SITE_URL } from "@/lib/constants";
@@ -212,6 +213,8 @@ export default async function ListingPage({ params }: Props) {
           {listing.description}
         </p>
       </section>
+
+      <PublicarEnRedes listingId={listing.id} />
 
       <aside className="max-w-prose rounded-card border border-border bg-card p-4 text-meta text-muted-foreground">
         <h2 className="mb-1 text-base font-semibold text-foreground">

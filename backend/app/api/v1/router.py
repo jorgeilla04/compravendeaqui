@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     categories,
     listings,
     moderacion,
+    redes,
     search,
     seo,
     tiendas,
@@ -27,5 +28,6 @@ api_router.include_router(seo.router)
 api_router.include_router(tiendas.router)
 api_router.include_router(tiendas_admin.router)
 api_router.include_router(moderacion.router)
+api_router.include_router(redes.router)
 api_router.include_router(transporte.router)
 api_router.include_router(transporte_admin.router)
