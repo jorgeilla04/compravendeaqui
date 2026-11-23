@@ -85,9 +85,11 @@ services:
       # Solo el gateway (IP fija en la red interna) puede informar la IP real.
       TRUSTED_PROXIES: 172.31.250.10
     # El bucket y su política los crea deploy.sh con el root de MinIO.
+    # --timeout-keep-alive mayor que el de Caddy (2 min): si la API cierra
+    # antes una conexión ociosa, Caddy puede reusarla y el POST falla con 502.
     command: >-
       sh -c "alembic upgrade head &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --no-server-header"
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --no-server-header --timeout-keep-alive 130"
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
