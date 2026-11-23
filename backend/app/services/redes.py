@@ -160,6 +160,37 @@ def pieza_de_producto(tienda: Tienda, grupo: Grupo, pp: Any) -> Pieza:
     )
 
 
+def pieza_de_paquete(paquete: Any) -> Pieza:
+    """Un paquete de viaje de un transportista (ej.: Mar del Plata 2027)."""
+    transportista = paquete.transportista
+    salidas = [s for s in paquete.salidas if s.activo]
+    precios = [s.precio_persona for s in salidas if s.precio_persona]
+    desde = min(precios) if precios else paquete.precio_desde
+    detalles = []
+    if salidas:
+        nombres = [s.nombre or s.fecha.strftime("%d/%m/%Y") for s in salidas]
+        detalles.append(f"🗓️ Salidas: {', '.join(nombres[:4])}")
+    if paquete.dias:
+        noches = f" / {paquete.noches} noches" if paquete.noches else ""
+        detalles.append(f"🌙 {paquete.dias} días{noches}")
+    detalles.append("🚌 Saliendo desde San Juan")
+    if transportista.sena_pct:
+        detalles.append(
+            f"✅ Reservás tu lugar con una seña del {transportista.sena_pct}%"
+        )
+    base = settings.public_site_url.rstrip("/")
+    return Pieza(
+        titulo=paquete.titulo,
+        precio=f"Desde $ {_pesos(desde)}" if desde else "Consultar precio",
+        url=f"{base}/transporte/{transportista.slug}/paquetes/{paquete.slug}",
+        etiqueta="Viajes",
+        detalles=detalles,
+        hashtags=["#Viajes", "#Vacaciones"],
+        foto=lambda: _foto_tienda(paquete.foto_url),
+        carpeta=f"transporte/{transportista.slug}/{paquete.slug}",
+    )
+
+
 def texto_de(pieza: Pieza, red: str) -> str:
     """Texto de la publicación: en Instagram los links no se pueden tocar, así
     que se indica dónde buscarlo."""

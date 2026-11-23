@@ -6,10 +6,8 @@ import * as React from "react";
 import { filterGrupos } from "@/components/tiendas/grupo-explorer";
 import { GrupoLogo } from "@/components/tiendas/grupo-logo";
 import { useOptionalAuth } from "@/components/auth/auth-provider";
-import {
-  esAdminDelSitio,
-  PublicarProductoEnRedes,
-} from "@/components/redes/publicar-producto";
+import { esAdminDelSitio } from "@/components/redes/publicar-producto";
+import { RedesDelColegio } from "@/components/redes/redes-del-colegio";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -626,9 +624,7 @@ function EditarGrupo({
     ...(productos.length > 0
       ? [{ id: "productos" as const, label: "Productos y precios" }]
       : []),
-    ...(esAdmin && enVenta.length > 0
-      ? [{ id: "redes" as const, label: "Redes" }]
-      : []),
+    ...(enVenta.length > 0 ? [{ id: "redes" as const, label: "Redes" }] : []),
   ];
   const base = `editar-${grupo.slug}`;
 
@@ -763,9 +759,11 @@ function EditarGrupo({
             >
               {/* Se monta al abrir la pestaña: no arma imágenes de más. */}
               {pestana === "redes" ? (
-                <PublicarProductoEnRedes
+                <RedesDelColegio
                   tienda={tienda.slug}
-                  grupo={{ slug: grupo.slug, productos: enVenta }}
+                  grupo={grupo.slug}
+                  productos={enVenta}
+                  esAdminDelSitio={esAdmin}
                 />
               ) : null}
             </div>

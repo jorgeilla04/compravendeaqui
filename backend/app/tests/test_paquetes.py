@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -11,10 +12,11 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from PIL import Image
+from sqlalchemy import select, update
 
 from app.config import settings
-from app.models import Reserva, User
+from app.models import Reserva, TransporteAdmin, Transportista, User
 from app.scripts.importar_paquetes import main as importar
 from app.services import mailer
 from app.tests.conftest import jpeg_bytes
@@ -285,3 +287,38 @@ def test_tope_de_mails_por_casilla_no_impide_reservar(
     destinos = [m["To"] for m in mails]
     assert destinos.count("administracion@blancapalomasrl.com.ar") == 2
     assert destinos.count("laura@gmail.com") == 1
+
+
+def test_kit_para_redes_del_transportista(
+    admin: TestClient,
+    paquete: dict[str, Any],
+    make_user: MakeUser,
+    db: Any,
+) -> None:
+    """El encargado del transportista baja imagen y texto para sus redes."""
+    encargado, data = make_user()
+    otro, _ = make_user()
+    bp = db.scalars(
+        select(Transportista).where(Transportista.slug == "blanca-paloma")
+    ).one()
+    user = db.scalars(
+        select(User).where(User.username == data["user"]["username"])
+    ).one()
+    db.add(TransporteAdmin(transportista_id=bp.id, user_id=user.id))
+    db.commit()
+
+    kit = f"{ADMIN}/paquetes/{paquete['slug']}/kit"
+    r = encargado.get(kit)
+    assert r.status_code == 200, r.text
+    texto = r.json()["textos"]["facebook"]
+    assert texto.startswith("Mar del Plata – Preventa verano 2027\n💰 Desde $ 700.000")
+    assert "🗓️ Salidas: Enero 2027" in texto
+    assert "🌙 10 días / 7 noches" in texto
+    assert "seña del 30%" in texto
+    assert r.json()["url"].endswith(
+        "/transporte/blanca-paloma/paquetes/mar-del-plata-preventa-verano-2027"
+    )
+    img = encargado.get(f"{kit}/imagen.jpg")
+    assert Image.open(io.BytesIO(img.content)).size == (1080, 1080)
+    # Otro usuario no ve el kit de un transportista que no administra.
+    assert otro.get(kit).status_code == 404

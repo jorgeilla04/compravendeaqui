@@ -79,3 +79,11 @@ class ProgramacionOut(BaseModel):
     estado: str
     error: str | None
     publicaciones: list[PublicacionOut]
+
+
+class KitRedesOut(BaseModel):
+    """Para que cada tienda publique en sus propias redes: el texto listo para
+    cada red y el link a su página (la imagen se baja aparte)."""
+
+    textos: dict[str, str]
+    url: str

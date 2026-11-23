@@ -17,6 +17,7 @@ from app.api.deps import AdminUser, CompleteUser, DbSession
 from app.api.v1.endpoints.tiendas import pedido_out
 from app.models import Grupo, Pedido, PrecioGrupo, Producto, Tienda, User
 from app.models.tiendas import TiendaAdmin, TiendaConsulta
+from app.schemas.redes import KitRedesOut
 from app.schemas.tiendas import (
     CatalogoAdminOut,
     ConsultaTiendaAdminOut,
@@ -39,6 +40,7 @@ from app.schemas.tiendas import (
     TiendaIn,
     TiendaResumenOut,
 )
+from app.services import redes
 from app.services import tiendas as service
 
 router = APIRouter(prefix="/admin/tiendas", tags=["tiendas-admin"])
@@ -536,3 +538,41 @@ def estado_consulta(
     db.commit()
     db.refresh(consulta)
     return ConsultaTiendaAdminOut.model_validate(consulta)
+
+
+# --- Kit para redes: cada tienda publica en sus propias redes -------------------
+
+KIT = "/{slug}/grupos/{grupo_slug}/productos/{producto_slug}/kit"
+
+
+def _pieza_prenda(
+    db: DbSession, user: User, slug: str, grupo_slug: str, producto_slug: str
+) -> redes.Pieza:
+    tienda = _tienda(db, user, slug)
+    _, grupo, pp = redes.get_producto_de_grupo(
+        db, tienda.slug, grupo_slug, producto_slug
+    )
+    return redes.pieza_de_producto(tienda, grupo, pp)
+
+
+@router.get(KIT, response_model=KitRedesOut)
+def kit_prenda(
+    slug: str, grupo_slug: str, producto_slug: str, user: CompleteUser, db: DbSession
+) -> KitRedesOut:
+    pieza = _pieza_prenda(db, user, slug, grupo_slug, producto_slug)
+    return KitRedesOut(
+        textos={red: redes.texto_de(pieza, red) for red in redes.REDES},
+        url=pieza.url,
+    )
+
+
+@router.get(KIT + "/imagen.jpg")
+def kit_prenda_imagen(
+    slug: str, grupo_slug: str, producto_slug: str, user: CompleteUser, db: DbSession
+) -> Response:
+    pieza = _pieza_prenda(db, user, slug, grupo_slug, producto_slug)
+    return Response(
+        redes.componer(pieza),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, no-store"},
+    )
