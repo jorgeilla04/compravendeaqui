@@ -47,7 +47,7 @@ describe("Publicar en redes", () => {
     );
     expect(screen.getByLabelText(/Facebook/)).toBeDisabled();
     expect(screen.getByRole("button", { name: "Publicar" })).toBeDisabled();
-    expect(screen.getByText(/Todavía no está conectada/)).toBeVisible();
+    expect(screen.queryByText(/falta conectar/i)).not.toBeInTheDocument();
   });
 
   it("publica en las redes elegidas y muestra el link", async () => {

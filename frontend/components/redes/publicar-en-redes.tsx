@@ -164,9 +164,6 @@ export function PublicarEnRedes({
                     onChange={() => alternar(r.id)}
                   />
                   {r.nombre}
-                  {!datos.conectadas[r.id] ? (
-                    <span className="text-meta">(falta conectar)</span>
-                  ) : null}
                 </label>
               ))}
               <Button
@@ -178,12 +175,6 @@ export function PublicarEnRedes({
                 {saving ? "Publicando…" : "Publicar"}
               </Button>
             </fieldset>
-            {!datos.conectadas.facebook && !datos.conectadas.instagram ? (
-              <p className="text-meta text-muted-foreground">
-                Todavía no está conectada la página de Facebook: la vista previa
-                ya muestra cómo va a quedar.
-              </p>
-            ) : null}
             {error ? <FormMessage>{error}</FormMessage> : null}
           </div>
         </div>
