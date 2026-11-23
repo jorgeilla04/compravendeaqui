@@ -5,6 +5,11 @@ import * as React from "react";
 
 import { filterGrupos } from "@/components/tiendas/grupo-explorer";
 import { GrupoLogo } from "@/components/tiendas/grupo-logo";
+import { useOptionalAuth } from "@/components/auth/auth-provider";
+import {
+  esAdminDelSitio,
+  PublicarProductoEnRedes,
+} from "@/components/redes/publicar-producto";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -587,7 +592,7 @@ function ProductosDelGrupo({
   );
 }
 
-type Pestana = "datos" | "productos";
+type Pestana = "datos" | "productos" | "redes";
 
 function EditarGrupo({
   tienda,
@@ -608,10 +613,21 @@ function EditarGrupo({
 }) {
   const [pestana, setPestana] = React.useState<Pestana>("datos");
   const [dirty, setDirty] = React.useState(false);
+  const esAdmin = esAdminDelSitio(useOptionalAuth()?.user?.role);
+  // Las prendas que se venden en este colegio (las suspendidas no).
+  const enVenta = productos.filter((producto) => {
+    const fila = precios.find(
+      (p) => p.grupo === grupo.slug && p.producto === producto.slug,
+    );
+    return producto.activo && (fila?.disponible ?? tienda.productos_en_todos);
+  });
   const pestanas: { id: Pestana; label: string }[] = [
     { id: "datos", label: "Datos y fotos" },
     ...(productos.length > 0
       ? [{ id: "productos" as const, label: "Productos y precios" }]
+      : []),
+    ...(esAdmin && enVenta.length > 0
+      ? [{ id: "redes" as const, label: "Redes" }]
       : []),
   ];
   const base = `editar-${grupo.slug}`;
@@ -735,6 +751,23 @@ function EditarGrupo({
                 onPrecio={onPrecio}
                 onDirty={setDirty}
               />
+            </div>
+          ) : null}
+          {pestanas.some((p) => p.id === "redes") ? (
+            <div
+              role="tabpanel"
+              id={`${base}-panel-redes`}
+              aria-labelledby={`${base}-tab-redes`}
+              hidden={pestana !== "redes"}
+              className={pestana === "redes" ? "pb-4" : undefined}
+            >
+              {/* Se monta al abrir la pestaña: no arma imágenes de más. */}
+              {pestana === "redes" ? (
+                <PublicarProductoEnRedes
+                  tienda={tienda.slug}
+                  grupo={{ slug: grupo.slug, productos: enVenta }}
+                />
+              ) : null}
             </div>
           ) : null}
         </div>
