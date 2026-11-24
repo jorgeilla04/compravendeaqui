@@ -247,8 +247,8 @@ export function KitRedes({
             {!puedeCompartir ? (
               <p className="text-meta text-muted-foreground">
                 «Publicar en {REDES.find((r) => r.id === red)?.nombre}» baja la
-                imagen, copia el texto y abre la red: creá la publicación,
-                subí la imagen y pegá el texto.
+                imagen, copia el texto y abre la red: creá la publicación, subí
+                la imagen y pegá el texto.
               </p>
             ) : null}
             {error ? <FormMessage>{error}</FormMessage> : null}
