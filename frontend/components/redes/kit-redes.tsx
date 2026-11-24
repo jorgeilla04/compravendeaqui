@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Download, Share2 } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Share2 } from "lucide-react";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,11 @@ import { FormMessage } from "@/components/ui/form";
 import { api, buildUrl, errorMessage } from "@/lib/api";
 import { type Red, REDES } from "@/lib/redes";
 import { cn } from "@/lib/utils";
+
+const SITIO: Record<Red, string> = {
+  facebook: "https://www.facebook.com/",
+  instagram: "https://www.instagram.com/",
+};
 
 interface Kit {
   textos: Record<Red, string>;
@@ -52,7 +57,10 @@ export function KitRedes({
   }, [path]);
 
   React.useEffect(() => {
-    setPuedeCompartir(typeof navigator !== "undefined" && "share" in navigator);
+    // En la compu el menú «Compartir» del sistema no ofrece Instagram ni
+    // Facebook (están en el navegador), así que sólo se usa en el celular.
+    const tactil = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+    setPuedeCompartir(tactil && "share" in navigator);
   }, []);
 
   const imagen = `${path}/imagen.jpg`;
@@ -68,19 +76,51 @@ export function KitRedes({
     }
   }
 
+  async function guardarImagen() {
+    const blob = await bajarImagen(imagen);
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = `${archivo}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+  }
+
+  /** Compu: copia el texto, baja la imagen y abre la red en otra pestaña. */
+  async function publicarEn() {
+    // Abrir y copiar antes de cualquier espera: el navegador sólo lo permite
+    // dentro del clic.
+    window.open(SITIO[red], "_blank", "noopener");
+    const copia = navigator.clipboard
+      ? navigator.clipboard.writeText(texto).then(
+          () => true,
+          () => false,
+        )
+      : Promise.resolve(false);
+    setOcupado(true);
+    setError(null);
+    try {
+      await guardarImagen();
+      if (await copia) {
+        setCopiado(true);
+        window.setTimeout(() => setCopiado(false), 4000);
+      } else {
+        setError("La imagen se bajó, pero copiá el texto con «Copiar texto».");
+      }
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
   async function descargar() {
     setOcupado(true);
     setError(null);
     try {
-      const blob = await bajarImagen(imagen);
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = href;
-      a.download = `${archivo}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(href);
+      await guardarImagen();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -168,10 +208,20 @@ export function KitRedes({
                   <Share2 aria-hidden="true" />
                   Compartir
                 </Button>
-              ) : null}
+              ) : (
+                <Button
+                  type="button"
+                  variant="accent"
+                  onClick={() => void publicarEn()}
+                  disabled={ocupado}
+                >
+                  <ExternalLink aria-hidden="true" />
+                  Publicar en {REDES.find((r) => r.id === red)?.nombre}
+                </Button>
+              )}
               <Button
                 type="button"
-                variant={puedeCompartir ? "outline" : "accent"}
+                variant="outline"
                 onClick={() => void descargar()}
                 disabled={ocupado}
               >
@@ -194,6 +244,13 @@ export function KitRedes({
             <p role="status" className="sr-only">
               {copiado ? "Texto copiado" : ""}
             </p>
+            {!puedeCompartir ? (
+              <p className="text-meta text-muted-foreground">
+                «Publicar en {REDES.find((r) => r.id === red)?.nombre}» baja la
+                imagen, copia el texto y abre la red: creá la publicación, subí
+                la imagen y pegá el texto.
+              </p>
+            ) : null}
             {error ? <FormMessage>{error}</FormMessage> : null}
           </div>
         </div>
