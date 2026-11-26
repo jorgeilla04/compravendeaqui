@@ -59,6 +59,7 @@ def _apply_config(tienda: Tienda, body: TiendaConfigIn | TiendaIn) -> None:
         setattr(tienda, key, value)
     if tienda.retiro_direccion:
         tienda.retiro_direccion = tienda.retiro_direccion.strip() or None
+    tienda.stock_demora = (tienda.stock_demora or "").strip() or None
     service.validar_config(tienda)
 
 

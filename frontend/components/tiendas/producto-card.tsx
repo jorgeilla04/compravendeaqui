@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, MessageCircle, Minus, Plus } from "lucide-react";
+import { Check, Clock, MessageCircle, Minus, Plus, Truck } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
@@ -21,11 +21,14 @@ export function ProductoCard({
   producto,
   opcionLabel,
   whatsappUrl,
+  demoras,
 }: {
   grupo: GrupoDetalle;
   producto: Producto;
   opcionLabel: string;
   whatsappUrl?: string;
+  /** Tiendas con stock: cuánto tarda lo que está en stock y lo que no. */
+  demoras?: { stock: string; pedido: string } | null;
 }) {
   const { add, tienda } = useCart();
   const tieneOpciones = producto.opciones.length > 0;
@@ -72,6 +75,7 @@ export function ProductoCard({
       opcion: tieneOpciones ? opcion : null,
       cantidad,
       precio: Number(precio),
+      enStock: Boolean(producto.en_stock),
     });
     setAdded(
       `Agregaste ${cantidad} ${nombre}${
@@ -82,7 +86,10 @@ export function ProductoCard({
   }
 
   return (
-    <li className="flex flex-col overflow-hidden rounded-card border border-border bg-card">
+    <li
+      id={id}
+      className="flex scroll-mt-24 flex-col overflow-hidden rounded-card border border-border bg-card target:ring-2 target:ring-primary"
+    >
       <div className="flex h-36 items-center justify-center bg-muted p-3 sm:aspect-[4/3] sm:h-auto sm:p-4">
         {producto.foto_url ? (
           // eslint-disable-next-line @next/next/no-img-element -- foto del bucket
@@ -117,10 +124,40 @@ export function ProductoCard({
             {precioMostrado === null ? "Consultar" : pesosLabel(precioMostrado)}
           </span>
         </div>
+        {demoras ? (
+          producto.en_stock ? (
+            <p className="flex items-center gap-1.5 text-meta font-semibold text-success">
+              <Truck aria-hidden="true" className="size-4" />
+              En stock · llega en {demoras.stock}
+            </p>
+          ) : (
+            <p className="flex items-center gap-1.5 text-meta text-muted-foreground">
+              <Clock aria-hidden="true" className="size-4" />
+              Llega en {demoras.pedido}
+            </p>
+          )
+        ) : null}
         {producto.descripcion ? (
-          <p className="text-meta text-muted-foreground">
-            {producto.descripcion}
-          </p>
+          producto.descripcion.length > 160 ? (
+            <details className="group text-meta text-muted-foreground">
+              <summary className="cursor-pointer list-none">
+                <span className="line-clamp-2 group-open:hidden">
+                  {producto.descripcion}
+                </span>
+                <span className="font-semibold text-primary underline-offset-4 hover:underline group-open:hidden">
+                  Ver detalles
+                </span>
+                <span className="hidden font-semibold text-primary group-open:inline">
+                  Ocultar detalles
+                </span>
+              </summary>
+              <p className="mt-2 whitespace-pre-line">{producto.descripcion}</p>
+            </details>
+          ) : (
+            <p className="text-meta text-muted-foreground">
+              {producto.descripcion}
+            </p>
+          )
         ) : null}
         {tieneOpciones ? (
           <SelectField

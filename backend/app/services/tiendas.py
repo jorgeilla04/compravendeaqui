@@ -7,7 +7,7 @@ import re
 import secrets
 import unicodedata
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
@@ -24,7 +24,7 @@ from app.models import Grupo, Pedido, PedidoItem, PrecioGrupo, Producto, Tienda,
 from app.models.tiendas import TiendaAdmin, TiendaConsulta
 from app.schemas.tiendas import ConsultaTiendaIn
 from app.services import images as image_service
-from app.services import mailer, mercadopago, storage
+from app.services import mailer, mercadopago, proveedores, storage
 
 log = get_logger(__name__)
 
@@ -263,10 +263,64 @@ def _contiene(vocabulario: list[str], raiz: str) -> bool:
 
 
 @dataclass
+class ProductoEncontrado:
+    producto: Producto
+    grupo: Grupo
+    precio: Decimal
+    foto_url: str | None
+
+
+@dataclass
 class TiendaEncontrada:
     tienda: Tienda
     grupos: list[Grupo]
     total_grupos: int
+    productos: list[ProductoEncontrado] = field(default_factory=list)
+    total_productos: int = 0
+
+
+def _productos_que_coinciden(
+    db: Session, tienda: Tienda, raices: list[str]
+) -> list[ProductoEncontrado]:
+    """Productos a la venta cuyo nombre tiene todas las raíces buscadas.
+
+    Solo en tiendas de catálogo (cada producto en su rubro): en las que venden
+    todo en todos los grupos (uniformes) el grupo es lo que se busca."""
+    if tienda.productos_en_todos or not raices:
+        return []
+    filas = db.execute(
+        select(Producto, Grupo, PrecioGrupo)
+        .join(PrecioGrupo, PrecioGrupo.producto_id == Producto.id)
+        .join(Grupo, Grupo.id == PrecioGrupo.grupo_id)
+        .where(
+            Producto.tienda_id == tienda.id,
+            Producto.activo.is_(True),
+            Grupo.activo.is_(True),
+            PrecioGrupo.disponible.is_(True),
+        )
+        .order_by(Producto.orden, Producto.nombre)
+    ).all()
+    encontrados: list[ProductoEncontrado] = []
+    vistos: set[uuid.UUID] = set()
+    for producto, grupo, precio in filas:
+        if producto.id in vistos:
+            continue
+        palabras = _raices(producto.nombre)
+        if all(_contiene(palabras, r) for r in raices):
+            vistos.add(producto.id)
+            encontrados.append(
+                ProductoEncontrado(
+                    producto,
+                    grupo,
+                    (
+                        precio.precio
+                        if precio.precio is not None
+                        else producto.precio_base
+                    ),
+                    precio.foto_url or producto.foto_url,
+                )
+            )
+    return encontrados
 
 
 def buscar(db: Session, q: str, *, limite: int = 12) -> list[TiendaEncontrada]:
@@ -286,6 +340,7 @@ def buscar(db: Session, q: str, *, limite: int = 12) -> list[TiendaEncontrada]:
         )
         resto = [r for r in raices if not _contiene(vocabulario, r)]
         grupos = list_grupos(db, tienda)
+        productos = _productos_que_coinciden(db, tienda, resto)
         if resto:
             grupos = [
                 g
@@ -297,9 +352,17 @@ def buscar(db: Session, q: str, *, limite: int = 12) -> list[TiendaEncontrada]:
                 )
                 and all(_contiene(palabras, r) for r in resto)
             ]
-            if not grupos and len(resto) == len(raices):
+            if not grupos and not productos and len(resto) == len(raices):
                 continue
-        encontradas.append(TiendaEncontrada(tienda, grupos[:limite], len(grupos)))
+        encontradas.append(
+            TiendaEncontrada(
+                tienda,
+                grupos[:limite],
+                len(grupos),
+                productos[:limite],
+                len(productos),
+            )
+        )
     return encontradas
 
 
@@ -460,9 +523,16 @@ def whatsapp_cliente_url(pedido: Pedido) -> str:
     )
 
 
-def entrega_label(tienda: Tienda, entrega: str) -> str:
+def demora_envio(tienda: Tienda, en_stock: list[bool]) -> str:
+    """Demora del envío estándar: la de stock si todo está en stock."""
+    if tienda.stock_demora and en_stock and all(en_stock):
+        return tienda.stock_demora
+    return tienda.envio_demora
+
+
+def entrega_label(tienda: Tienda, entrega: str, demora: str | None = None) -> str:
     return {
-        "estandar": f"Envío a domicilio ({tienda.envio_demora})",
+        "estandar": f"Envío a domicilio ({demora or tienda.envio_demora})",
         "express": f"Envío express ({tienda.express_demora})",
         "retiro": "Retiro en el local",
     }[entrega]
@@ -535,6 +605,7 @@ def crear_pedido(
     grupos: dict[str, Grupo] = {}
     catalogo: dict[str, dict[str, ProductoPrecio]] = {}
     lineas: list[PedidoItem] = []
+    en_stock: list[bool] = []
     subtotal = Decimal(0)
     for item in items:
         if item.grupo not in grupos:
@@ -571,6 +642,7 @@ def crear_pedido(
                 ),
             )
         subtotal += precio * item.cantidad
+        en_stock.append(pp.producto.en_stock)
         lineas.append(
             PedidoItem(
                 grupo_id=grupo.id,
@@ -595,6 +667,7 @@ def crear_pedido(
         departamento=None if retiro else cliente.departamento,
         notas=cliente.notas,
         entrega=entrega,
+        demora=demora_envio(tienda, en_stock) if entrega == "estandar" else None,
         modalidad_pago=modalidad_pago,
         subtotal=t.subtotal,
         envio_monto=t.envio_monto,
@@ -748,7 +821,8 @@ def _resumen_texto(pedido: Pedido) -> str:
         ),
         "",
         f"Productos: {formato_pesos(pedido.subtotal)}",
-        f"{entrega_label(tienda, pedido.entrega)}: {formato_pesos(pedido.envio_monto)}",
+        f"{entrega_label(tienda, pedido.entrega, pedido.demora)}: "
+        f"{formato_pesos(pedido.envio_monto)}",
     ]
     if pedido.recargo_express:
         lineas.append(f"Recargo express: {formato_pesos(pedido.recargo_express)}")
@@ -780,11 +854,14 @@ def _resumen_texto(pedido: Pedido) -> str:
 
 
 def notificar_vendedor(db: Session, pedido: Pedido) -> None:
-    """Mail al dueño de la tienda con el detalle. Si falla, el pedido igual queda."""
+    """Mail al dueño de la tienda con el detalle y, si la tienda tiene
+    integración con su proveedor, el pedido por API. Si falla, el pedido igual
+    queda."""
     try:
         _notificar_vendedor(db, pedido)
     except Exception as exc:  # nunca romper un pedido ya guardado
         log.error("tiendas.aviso_error", codigo=pedido.codigo, error=repr(exc))
+    proveedores.enviar_pedido(pedido)
 
 
 def _notificar_vendedor(db: Session, pedido: Pedido) -> None:

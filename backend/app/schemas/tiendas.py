@@ -97,6 +97,15 @@ class GrupoOut(BaseModel):
     logo_url: str | None
 
 
+class ProductoEncontradoOut(BaseModel):
+    slug: str
+    nombre: str
+    precio: Monto
+    foto_url: str | None
+    grupo: str  # slug del grupo (rubro) donde se vende
+    grupo_nombre: str
+
+
 class TiendaBusquedaOut(BaseModel):
     """Una tienda que coincide con la búsqueda y sus grupos que coinciden."""
 
@@ -104,6 +113,8 @@ class TiendaBusquedaOut(BaseModel):
     grupo_label: str
     grupos: list[GrupoOut]
     total_grupos: int
+    productos: list[ProductoEncontradoOut] = Field(default_factory=list)
+    total_productos: int = 0
 
 
 class TiendaOut(TiendaResumenOut):
@@ -123,6 +134,7 @@ class TiendaOut(TiendaResumenOut):
     express_recargo_pct: int
     express_monto: Monto
     express_demora: str
+    stock_demora: str | None = None
     retiro_direccion: str | None
     sena_pct: int
     pagos_online: bool
@@ -174,6 +186,7 @@ class ProductoOut(BaseModel):
     # talles valen "precio". precio_desde: el más económico, para publicar.
     precios_talle: dict[str, Monto | None] = Field(default_factory=dict)
     precio_desde: Monto | None = None
+    en_stock: bool = False
 
 
 class GrupoDetalleOut(GrupoOut):
@@ -302,6 +315,9 @@ class TiendaConfigBase(BaseModel):
     express_recargo_pct: int = Field(default=0, ge=0, le=200)
     express_monto: Monto = Field(default=Decimal(0), ge=0, le=1_000_000)
     express_demora: str = Field(default="24 hs", min_length=1, max_length=40)
+    # Con demora de stock, cada producto se marca en stock (sale en esta
+    # demora) o a pedido (sale en envio_demora). None = no se distingue.
+    stock_demora: str | None = Field(default=None, max_length=40)
     retiro_habilitado: bool = False
     retiro_direccion: str | None = Field(default=None, max_length=255)
     sena_habilitada: bool = True
@@ -420,7 +436,7 @@ def _tramos_validos(value: list[Tramo] | None) -> list[Tramo] | None:
 
 class ProductoIn(BaseModel):
     nombre: str = Field(min_length=2, max_length=120)
-    descripcion: str | None = Field(default=None, max_length=1000)
+    descripcion: str | None = Field(default=None, max_length=2000)
     tipo: TipoIlustracion = "generico"
     precio_base: Monto = Field(ge=0, le=100_000_000)
     opciones: list[str] = Field(default_factory=list, max_length=40)
@@ -434,7 +450,7 @@ class ProductoIn(BaseModel):
 
 class ProductoUpdateIn(BaseModel):
     nombre: str | None = Field(default=None, min_length=2, max_length=120)
-    descripcion: str | None = Field(default=None, max_length=1000)
+    descripcion: str | None = Field(default=None, max_length=2000)
     tipo: TipoIlustracion | None = None
     precio_base: Monto | None = Field(default=None, ge=0, le=100_000_000)
     opciones: list[str] | None = Field(default=None, max_length=40)
@@ -443,6 +459,7 @@ class ProductoUpdateIn(BaseModel):
     medidas: Medidas | None = None
     tramos: list[Tramo] | None = Field(default=None, max_length=10)
     costo: Monto | None = Field(default=None, ge=0, le=100_000_000)
+    en_stock: bool | None = None
 
     @field_validator("opciones")
     @classmethod
@@ -468,6 +485,7 @@ class ProductoAdminOut(BaseModel):
     medidas: Medidas | None = None
     tramos: list[Tramo] = Field(default_factory=list)
     costo: Monto | None = None
+    en_stock: bool = False
     orden: int
     activo: bool
 

@@ -50,4 +50,41 @@ describe("TiendasEncontradas", () => {
       screen.getByRole("link", { name: "Ver los 42 colegios" }),
     ).toHaveAttribute("href", "/tiendas/uniformes");
   });
+
+  it("muestra productos de tiendas de catálogo con link a su rubro", () => {
+    render(
+      <TiendasEncontradas
+        q="heladera"
+        encontradas={[
+          {
+            tienda: { slug: "kanji", nombre: "Kanji", descripcion: null },
+            grupo_label: "Rubro",
+            grupos: [],
+            total_grupos: 0,
+            productos: [
+              {
+                slug: "heladera-kanji-280-l",
+                nombre: "Heladera Kanji 280 L",
+                precio: "769999.00",
+                foto_url: "https://cdn/x.webp",
+                grupo: "heladeras-y-freezers",
+                grupo_nombre: "Heladeras y freezers",
+              },
+            ],
+            total_productos: 3,
+          },
+        ]}
+      />,
+    );
+    const seccion = screen.getByRole("region", { name: "Kanji" });
+    expect(
+      within(seccion).getByRole("link", { name: /Heladera Kanji 280 L/ }),
+    ).toHaveAttribute(
+      "href",
+      "/tiendas/kanji/heladeras-y-freezers#producto-heladera-kanji-280-l",
+    );
+    expect(within(seccion).getByText("$ 769.999")).toBeVisible();
+    expect(within(seccion).getByText(/Y 2 productos más/)).toBeVisible();
+    expect(within(seccion).queryByText(/No está tu/)).toBeNull();
+  });
 });

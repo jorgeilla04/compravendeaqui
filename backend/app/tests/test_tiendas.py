@@ -22,8 +22,10 @@ from sqlalchemy import select, update
 from app.config import Settings, settings
 from app.models import Grupo, Pedido, Tienda, User
 from app.models.tiendas import TiendaAdmin
+from app.scripts.avisos_a_tienda import main as avisos_a_tienda
 from app.scripts.fotos_grupo import main as fotos_grupo
 from app.scripts.import_grupos import import_grupos
+from app.scripts.importar_avisos import main as importar_avisos
 from app.scripts.make_admin import set_role
 from app.services import mailer
 from app.services.mercadopago import valid_signature
@@ -1399,3 +1401,174 @@ def test_kit_para_redes_de_la_tienda(
     # Publicar en las redes del sitio sigue siendo solo del administrador.
     redes = f"/api/v1/admin/redes/tiendas/uniformes/grupos/{colegio['slug']}"
     assert encargada.get(f"{redes}/productos/remera").status_code == 403
+
+
+# --- Catálogo con stock (ej.: Kanji) -------------------------------------------
+
+CATALOGO = {
+    **LIBRERIA,
+    "nombre": "Electro Catálogo",
+    "grupo_label": "Rubro",
+    "opcion_label": "Variante",
+    "categorias": ["Electrodomésticos"],
+    "envio_demora": "7 a 10 días",
+    "stock_demora": "24 hs",
+}
+
+
+def _catalogo(admin: TestClient) -> tuple[str, str]:
+    """Tienda de catálogo con una heladera en stock y un lavarropas a pedido."""
+    assert admin.post(ADMIN, json=CATALOGO).status_code == 201
+    base = f"{ADMIN}/electro-catalogo"
+    rubro = admin.post(
+        f"{base}/grupos", json={"nombre": "Heladeras", "categoria": "Electrodomésticos"}
+    ).json()["slug"]
+    for nombre, en_stock in (
+        ("Heladera Kanji 280 L", True),
+        ("Lavarropas 8 kg", False),
+    ):
+        producto = admin.post(
+            f"{base}/productos", json={"nombre": nombre, "precio_base": "500000"}
+        ).json()
+        admin.put(f"{base}/productos/{producto['slug']}", json={"en_stock": en_stock})
+        admin.put(
+            f"{base}/precios",
+            json={"grupo": rubro, "producto": producto["slug"], "disponible": True},
+        )
+    return base, rubro
+
+
+def _pedir(client: TestClient, rubro: str, *productos: str) -> dict[str, Any]:
+    response = client.post(
+        f"{API}/electro-catalogo/pedidos",
+        json={
+            "items": [
+                {"grupo": rubro, "producto": p, "cantidad": 1} for p in productos
+            ],
+            "entrega": "estandar",
+            "modalidad_pago": "total",
+            "cliente": CLIENTE,
+        },
+    )
+    assert response.status_code == 201, response.text
+    pedido: dict[str, Any] = response.json()["pedido"]
+    return pedido
+
+
+def test_entrega_segun_stock(admin: TestClient, client: TestClient) -> None:
+    _, rubro = _catalogo(admin)
+    tienda = client.get(f"{API}/electro-catalogo").json()
+    assert (tienda["envio_demora"], tienda["stock_demora"]) == ("7 a 10 días", "24 hs")
+    productos = client.get(f"{API}/electro-catalogo/grupos/{rubro}").json()["productos"]
+    assert {p["slug"]: p["en_stock"] for p in productos} == {
+        "heladera-kanji-280-l": True,
+        "lavarropas-8-kg": False,
+    }
+    solo_stock = _pedir(client, rubro, "heladera-kanji-280-l")
+    assert solo_stock["entrega_label"] == "Envío a domicilio (24 hs)"
+    mezcla = _pedir(client, rubro, "heladera-kanji-280-l", "lavarropas-8-kg")
+    assert mezcla["entrega_label"] == "Envío a domicilio (7 a 10 días)"
+
+
+def test_sin_demora_de_stock_no_se_distingue(
+    admin: TestClient, client: TestClient
+) -> None:
+    base, rubro = _catalogo(admin)
+    config = admin.get(f"{ADMIN}/electro-catalogo/catalogo").json()["tienda"]
+    config.update(stock_demora="  ")
+    config.pop("slug", None)
+    assert admin.put(base, json=config).status_code == 200
+    assert client.get(f"{API}/electro-catalogo").json()["stock_demora"] is None
+    productos = client.get(f"{API}/electro-catalogo/grupos/{rubro}").json()["productos"]
+    assert not any(p["en_stock"] for p in productos)
+    pedido = _pedir(client, rubro, "heladera-kanji-280-l")
+    assert pedido["entrega_label"] == "Envío a domicilio (7 a 10 días)"
+
+
+def test_buscador_encuentra_productos_de_catalogo(
+    admin: TestClient, client: TestClient, colegio: dict[str, Any]
+) -> None:
+    _, rubro = _catalogo(admin)
+    encontradas = client.get(f"{API}/buscar", params={"q": "heladeras"}).json()
+    catalogo = next(e for e in encontradas if e["tienda"]["slug"] == "electro-catalogo")
+    assert [(p["nombre"], p["grupo"]) for p in catalogo["productos"]] == [
+        ("Heladera Kanji 280 L", rubro)
+    ]
+    assert catalogo["total_productos"] == 1
+    # En uniformes se busca el colegio, no la prenda.
+    remeras = client.get(f"{API}/buscar", params={"q": "remera"}).json()
+    assert all(e["productos"] == [] for e in remeras)
+
+
+def test_script_avisos_a_tienda(
+    make_user: MakeUser, db: Any, client: TestClient, tmp_path: Any
+) -> None:
+    seller, me = make_user()
+    usuario = me["user"]["username"]
+    email = f"{usuario}@mail.com"
+    db.execute(
+        update(User)
+        .where(User.username == usuario)
+        .values(email=email, email_verified=True)
+    )
+    db.commit()
+    (tmp_path / "fotos").mkdir()
+    (tmp_path / "fotos" / "a.jpg").write_bytes(jpeg_bytes((600, 400)))
+    lista = tmp_path / "lista.json"
+    lista.write_text(
+        json.dumps(
+            {
+                "usuario": usuario,
+                "avisos": [
+                    {
+                        "titulo": "Heladera con freezer Kanji Home Serie 140 138 L",
+                        "descripcion": "Capacidad neta 138 L.",
+                        "categoria": "electrodomesticos",
+                        "precio": 549999,
+                        "departamento": "Capital",
+                        "fotos": ["fotos/a.jpg"],
+                    }
+                ],
+            }
+        )
+    )
+    importar_avisos([str(lista)])
+    aviso = seller.get("/api/v1/users/me/listings").json()[0]
+    archivo = tmp_path / "tienda.json"
+    archivo.write_text(
+        json.dumps(
+            {
+                "tienda": {
+                    "slug": "kanji",
+                    "nombre": "Kanji",
+                    "copiar_config_de": "uniformes",
+                    "envio_demora": "7 a 10 días",
+                    "stock_demora": "24 hs",
+                },
+                "encargados": [email],
+                "rubros": [{"nombre": "Heladeras y freezers", "categoria": "Hogar"}],
+                "productos": [{"aviso": aviso["id"], "rubro": "Heladeras y freezers"}],
+            }
+        )
+    )
+    assert avisos_a_tienda([str(archivo), "--dry-run"]) == (
+        "1 productos válidos en 1 rubros (sin cambios)"
+    )
+    assert avisos_a_tienda([str(archivo)]) == (
+        "1 productos nuevos en la tienda kanji; avisos dados de baja"
+    )
+    # Correrlo de nuevo no duplica.
+    assert avisos_a_tienda([str(archivo)]).startswith("0 productos nuevos")
+
+    tienda = client.get(f"{API}/kanji").json()
+    assert (tienda["grupo_label"], tienda["envio_demora"]) == ("Rubro", "7 a 10 días")
+    rubro = tienda["grupos"][0]["slug"]
+    productos = client.get(f"{API}/kanji/grupos/{rubro}").json()["productos"]
+    assert [(p["nombre"], p["precio"]) for p in productos] == [
+        ("Heladera con freezer Kanji Home Serie 140 138 L", "549999.00")
+    ]
+    assert "/tiendas/kanji/productos/" in productos[0]["foto_url"]
+    mios = seller.get("/api/v1/users/me/listings").json()
+    assert [a["status"] for a in mios] == ["draft"]
+    # El dueño de los avisos queda como encargado de la tienda.
+    assert [t["slug"] for t in seller.get(ADMIN).json()] == ["kanji"]

@@ -16,6 +16,11 @@ export function condiciones(tienda: Tienda): string[] {
           }.`,
     );
   }
+  if (tienda.stock_demora && tienda.entregas.includes("estandar")) {
+    items.push(
+      `Lo que está en stock llega en ${tienda.stock_demora}; el resto, en ${tienda.envio_demora}.`,
+    );
+  }
   if (tienda.entregas.includes("express")) {
     items.push(`Express en ${tienda.express_demora}.`);
   }
