@@ -15,6 +15,7 @@ const ACCESOS = [
   { href: "/inmuebles", label: "Inmuebles" },
   { href: "/herramientas-y-construccion", label: "Herramientas" },
   { href: "/tiendas/uniformes", label: "Uniformes escolares" },
+  { href: "/tiendas/kanji", label: "Tienda Kanji" },
 ];
 
 /**
