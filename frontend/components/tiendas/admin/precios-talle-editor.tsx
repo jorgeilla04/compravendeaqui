@@ -146,7 +146,8 @@ export function PreciosTalleEditor({
         <p className="text-meta text-muted-foreground">
           La tienda muestra el precio más económico y lo cambia al elegir el
           talle. Los talles a consultar muestran un botón de WhatsApp en lugar
-          del carrito. Valen para todos los colegios. Los costos solo los ves vos.
+          del carrito. Valen para todos los colegios. Los costos solo los ves
+          vos.
         </p>
         {producto.opciones.length === 0 ? (
           <p className="text-meta text-muted-foreground">

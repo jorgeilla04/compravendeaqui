@@ -443,6 +443,68 @@ describe("catálogo", () => {
   });
 });
 
+describe("tiendas con stock", () => {
+  const conStock = {
+    ...uniformes,
+    stock_demora: "24 hs",
+    envio_demora: "7 a 10 días",
+  };
+
+  it("la demora del envío depende de si todo está en stock", () => {
+    expect(entregaTextos(conStock, "estandar", 1000, true).title).toMatch(
+      /^A domicilio 24 hs/,
+    );
+    expect(entregaTextos(conStock, "estandar", 1000, false).title).toMatch(
+      /^A domicilio 7 a 10 días/,
+    );
+    expect(entregaTextos(uniformes, "estandar", 1000, true).title).toMatch(
+      /^A domicilio 48 hs/,
+    );
+    expect(condiciones(conStock)).toContain(
+      "Lo que está en stock llega en 24 hs; el resto, en 7 a 10 días.",
+    );
+  });
+
+  it("la tarjeta muestra el stock y pliega la descripción larga", async () => {
+    const user = userEvent.setup();
+    const producto = {
+      ...detalle.productos[1],
+      slug: "heladera",
+      nombre: "Heladera",
+      opciones: [],
+      en_stock: true,
+      descripcion: "Capacidad 280 L. ".repeat(20),
+    };
+    withCart(
+      <ul>
+        <ProductoCard
+          grupo={detalle}
+          producto={producto}
+          opcionLabel="Variante"
+          demoras={{ stock: "24 hs", pedido: "7 a 10 días" }}
+        />
+        <ProductoCard
+          grupo={detalle}
+          producto={{ ...producto, slug: "otra", en_stock: false }}
+          opcionLabel="Variante"
+          demoras={{ stock: "24 hs", pedido: "7 a 10 días" }}
+        />
+      </ul>,
+    );
+    expect(screen.getByText("En stock · llega en 24 hs")).toBeVisible();
+    expect(screen.getByText("Llega en 7 a 10 días")).toBeVisible();
+    await user.click(screen.getAllByText("Ver detalles")[0]);
+    expect(screen.getAllByText("Ocultar detalles")[0]).toBeVisible();
+    await user.click(
+      screen.getAllByRole("button", { name: "Agregar al carrito" })[0],
+    );
+    const guardado = JSON.parse(
+      window.localStorage.getItem(cartStorageKey("uniformes")) ?? "[]",
+    );
+    expect(guardado[0]).toMatchObject({ producto: "heladera", enStock: true });
+  });
+});
+
 describe("agregar productos", () => {
   it("pide la opción, suma cantidades y guarda el carrito de esa tienda", async () => {
     const user = userEvent.setup();

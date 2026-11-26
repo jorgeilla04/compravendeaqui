@@ -33,6 +33,19 @@ export interface TiendaEncontrada {
   grupo_label: string;
   grupos: Grupo[];
   total_grupos: number;
+  /** Productos de tiendas de catálogo cuyo nombre coincide (ej.: Kanji). */
+  productos?: ProductoEncontrado[];
+  total_productos?: number;
+}
+
+export interface ProductoEncontrado {
+  slug: string;
+  nombre: string;
+  precio: string;
+  foto_url: string | null;
+  /** Slug del grupo (rubro) donde se vende. */
+  grupo: string;
+  grupo_nombre: string;
 }
 
 /** Config de cobro y entrega de la tienda (la usan el carrito y la cotización). */
@@ -46,6 +59,8 @@ export interface TiendaReglas {
   express_recargo_pct: number;
   express_monto: string;
   express_demora: string;
+  /** Demora de los productos en stock (null: la tienda no distingue stock). */
+  stock_demora?: string | null;
   retiro_direccion: string | null;
   sena_pct: number;
 }
@@ -81,6 +96,8 @@ export interface Producto {
   precios_talle?: Record<string, string | null>;
   /** El precio más económico que se puede comprar (null: todo a consultar). */
   precio_desde?: string | null;
+  /** En stock: sale en stock_demora de la tienda. */
+  en_stock?: boolean;
 }
 
 export interface GrupoDetalle extends Grupo {
@@ -157,6 +174,7 @@ export interface TiendaConfig {
   express_recargo_pct: number;
   express_monto: string;
   express_demora: string;
+  stock_demora?: string | null;
   retiro_habilitado: boolean;
   retiro_direccion: string | null;
   sena_habilitada: boolean;
@@ -184,6 +202,7 @@ export interface ProductoAdmin {
   medidas?: Medidas | null;
   tramos?: Tramo[];
   costo?: string | null;
+  en_stock?: boolean;
   orden: number;
   activo: boolean;
 }

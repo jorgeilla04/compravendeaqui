@@ -64,6 +64,9 @@ class Tienda(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     express_recargo_pct: Mapped[int] = mapped_column(Integer, default=0)
     express_monto: Mapped[Decimal] = mapped_column(MONEY)
     express_demora: Mapped[str] = mapped_column(String(40))  # "24 hs"
+    # Demora de los productos marcados en stock (None = la tienda no distingue
+    # stock y todo sale en envio_demora).
+    stock_demora: Mapped[str | None] = mapped_column(String(40))
     # Retiro en el local (sin costo)
     retiro_habilitado: Mapped[bool] = mapped_column(Boolean, default=False)
     retiro_direccion: Mapped[str | None] = mapped_column(String(255))
@@ -138,6 +141,10 @@ class Producto(UUIDPrimaryKeyMixin, Base):
     )
     # Costo del precio base: solo lo ve quien administra (referencia de margen).
     costo: Mapped[Decimal | None] = mapped_column(MONEY)
+    # En stock: sale en tienda.stock_demora; si no, en tienda.envio_demora.
+    en_stock: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
     orden: Mapped[int] = mapped_column(Integer, default=0)
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -176,6 +183,8 @@ class Pedido(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     departamento: Mapped[str | None] = mapped_column(String(60))
     notas: Mapped[str | None] = mapped_column(Text)
     entrega: Mapped[str] = mapped_column(String(10))  # estandar | express | retiro
+    # Demora del envío estándar al momento de la compra (según el stock).
+    demora: Mapped[str | None] = mapped_column(String(40))
     modalidad_pago: Mapped[str] = mapped_column(String(10))  # sena | total
     subtotal: Mapped[Decimal] = mapped_column(MONEY)
     envio_monto: Mapped[Decimal] = mapped_column(MONEY)

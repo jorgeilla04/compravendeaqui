@@ -59,11 +59,19 @@ export function validateCliente(datos: DatosCliente, conEnvio = true): Errors {
   return errors;
 }
 
+/** Demora del envío: la de stock si todo lo del carrito está en stock. */
+export function demoraEnvio(tienda: Tienda, todoEnStock: boolean): string {
+  return tienda.stock_demora && todoEnStock
+    ? tienda.stock_demora
+    : tienda.envio_demora;
+}
+
 /** Textos de cada forma de entrega con la config de la tienda. */
 export function entregaTextos(
   tienda: Tienda,
   entrega: Entrega,
   subtotal: number,
+  todoEnStock = false,
 ): { title: string; detail: string } {
   const t = cotizar(subtotal, entrega, "total", tienda);
   const envio = t.envioMonto === 0 ? "sin cargo" : pesosLabel(t.envioMonto);
@@ -90,7 +98,7 @@ export function entregaTextos(
     };
   }
   return {
-    title: `A domicilio ${tienda.envio_demora} · ${envio}`,
+    title: `A domicilio ${demoraEnvio(tienda, todoEnStock)} · ${envio}`,
     detail: `Llega a ${tienda.departamentos_envio.join(", ")}.${gratisDesde}`,
   };
 }
@@ -372,7 +380,12 @@ export function Checkout({ tienda }: { tienda: Tienda }) {
               value={e}
               checked={entrega === e}
               onChange={() => setEntrega(e)}
-              {...entregaTextos(tienda, e, subtotal)}
+              {...entregaTextos(
+                tienda,
+                e,
+                subtotal,
+                items.length > 0 && items.every((i) => i.enStock),
+              )}
             />
           ))}
         </fieldset>

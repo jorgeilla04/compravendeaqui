@@ -21,6 +21,7 @@ from app.schemas.tiendas import (
     PedidoIn,
     PedidoItemOut,
     PedidoOut,
+    ProductoEncontradoOut,
     ProductoOut,
     TiendaBusquedaOut,
     TiendaOut,
@@ -51,6 +52,7 @@ def tienda_out(db: Session, tienda: Tienda) -> TiendaOut:
         express_recargo_pct=tienda.express_recargo_pct,
         express_monto=tienda.express_monto,
         express_demora=tienda.express_demora,
+        stock_demora=tienda.stock_demora,
         retiro_direccion=tienda.retiro_direccion if tienda.retiro_habilitado else None,
         sena_pct=tienda.sena_pct,
         pagos_online=settings.mp_configured,
@@ -63,7 +65,9 @@ def pedido_out(pedido: Pedido, model: type[PedidoOut] = PedidoOut) -> Any:
     extra = {
         "tienda": TiendaResumenOut.model_validate(pedido.tienda),
         "opcion_label": pedido.tienda.opcion_label,
-        "entrega_label": service.entrega_label(pedido.tienda, pedido.entrega),
+        "entrega_label": service.entrega_label(
+            pedido.tienda, pedido.entrega, pedido.demora
+        ),
         "items": [PedidoItemOut.model_validate(i) for i in pedido.items],
         "whatsapp_url": service.whatsapp_vendedor_url(pedido),
         "cliente_whatsapp_url": service.whatsapp_cliente_url(pedido),
@@ -96,6 +100,18 @@ def buscar(
             grupo_label=e.tienda.grupo_label,
             grupos=[GrupoOut.model_validate(g) for g in e.grupos],
             total_grupos=e.total_grupos,
+            productos=[
+                ProductoEncontradoOut(
+                    slug=p.producto.slug,
+                    nombre=p.producto.nombre,
+                    precio=p.precio,
+                    foto_url=p.foto_url,
+                    grupo=p.grupo.slug,
+                    grupo_nombre=p.grupo.nombre,
+                )
+                for p in e.productos
+            ],
+            total_productos=e.total_productos,
         )
         for e in service.buscar(db, q)
     ]
@@ -212,6 +228,7 @@ def grupo(slug: str, grupo_slug: str, db: DbSession) -> GrupoDetalleOut:
                 medidas=pp.producto.medidas,
                 precios_talle=pp.precios_talle,
                 precio_desde=pp.precio_desde,
+                en_stock=bool(found_tienda.stock_demora and pp.producto.en_stock),
             )
             for pp in service.productos_de(db, found_tienda, found)
         ],

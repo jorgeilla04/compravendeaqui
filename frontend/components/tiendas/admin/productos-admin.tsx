@@ -152,11 +152,14 @@ function ProductoRow({
   slug,
   producto,
   opcionLabel,
+  stockDemora,
   onSaved,
 }: {
   slug: string;
   producto: ProductoAdmin;
   opcionLabel: string;
+  /** Si la tienda distingue stock, cuánto tarda lo que está en stock. */
+  stockDemora?: string | null;
   onSaved: (p: ProductoAdmin) => void;
 }) {
   const [nombre, setNombre] = React.useState(producto.nombre);
@@ -168,6 +171,7 @@ function ProductoRow({
   );
   const [opciones, setOpciones] = React.useState(producto.opciones.join(", "));
   const [activo, setActivo] = React.useState(producto.activo);
+  const [enStock, setEnStock] = React.useState(Boolean(producto.en_stock));
   const [message, setMessage] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const id = `base-${producto.slug}`;
@@ -190,6 +194,7 @@ function ProductoRow({
             precio_base: precio || "0",
             opciones: parseOpciones(opciones),
             activo,
+            ...(stockDemora ? { en_stock: enStock } : {}),
           },
         }),
       );
@@ -277,6 +282,21 @@ function ProductoRow({
           />
           Se vende
         </label>
+        {stockDemora ? (
+          <label
+            htmlFor={`${id}-stock`}
+            className="flex min-h-11 items-center gap-2 text-base"
+          >
+            <input
+              id={`${id}-stock`}
+              type="checkbox"
+              checked={enStock}
+              onChange={(e) => setEnStock(e.target.checked)}
+              className="size-5 accent-[var(--color-primary)]"
+            />
+            En stock ({stockDemora})
+          </label>
+        ) : null}
         <Button type="button" variant="primary" onClick={save}>
           Guardar
         </Button>
@@ -416,6 +436,18 @@ export function ProductosAdmin({
 }) {
   const { tienda } = catalogo;
   const [grupo, setGrupo] = React.useState(catalogo.grupos[0]?.slug ?? "");
+  const [filtro, setFiltro] = React.useState("");
+  const normal = (t: string) =>
+    t
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+  const palabras = normal(filtro).split(/\s+/).filter(Boolean);
+  const visibles = palabras.length
+    ? catalogo.productos.filter((p) =>
+        palabras.every((w) => normal(p.nombre).includes(w)),
+      )
+    : catalogo.productos;
   const grupoLabel = tienda.grupo_label.toLowerCase();
   const replaceProducto = (p: ProductoAdmin) =>
     onChange({
@@ -449,13 +481,29 @@ export function ProductosAdmin({
           El precio base rige en todos los {grupoLabel}s, salvo que le cargues
           uno propio abajo.
         </p>
+        {catalogo.productos.length > 12 ? (
+          <label className="flex max-w-md flex-col gap-1 text-meta font-semibold">
+            Buscar producto
+            <input
+              type="search"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+              placeholder="Ej.: heladera 280"
+              className={`${input} w-full font-normal`}
+            />
+            <span className="font-normal text-muted-foreground">
+              {visibles.length} de {catalogo.productos.length} productos
+            </span>
+          </label>
+        ) : null}
         <ul className="flex flex-col gap-3">
-          {catalogo.productos.map((producto) => (
+          {visibles.map((producto) => (
             <ProductoRow
               key={producto.slug}
               slug={tienda.slug}
               producto={producto}
               opcionLabel={tienda.opcion_label}
+              stockDemora={tienda.stock_demora}
               onSaved={replaceProducto}
             />
           ))}

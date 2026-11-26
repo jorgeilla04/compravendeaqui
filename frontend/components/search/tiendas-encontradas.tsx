@@ -2,6 +2,7 @@ import { ArrowRight, Store } from "lucide-react";
 import Link from "next/link";
 
 import { GrupoCard } from "@/components/tiendas/grupo-card";
+import { pesosLabel } from "@/lib/tiendas/cotizar";
 import type { TiendaEncontrada } from "@/lib/tiendas/types";
 
 function plural(label: string) {
@@ -44,7 +45,10 @@ export function TiendasEncontradas({
   encontradas: TiendaEncontrada[];
   q?: string;
 }) {
-  return encontradas.map(({ tienda, grupo_label, grupos, total_grupos }) => {
+  return encontradas.map((encontrada) => {
+    const { tienda, grupo_label, grupos, total_grupos } = encontrada;
+    const productos = encontrada.productos ?? [];
+    const totalProductos = encontrada.total_productos ?? productos.length;
     const id = `tienda-${tienda.slug}`;
     const todos =
       total_grupos > grupos.length || grupos.length === 0
@@ -93,7 +97,55 @@ export function TiendasEncontradas({
             ))}
           </ul>
         ) : null}
-        {grupos.length === 0 && sinGenericas(q, grupo_label) ? (
+        {productos.length > 0 ? (
+          <>
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {productos.map((p) => (
+                <li key={p.slug}>
+                  <Link
+                    href={`/tiendas/${tienda.slug}/${p.grupo}#producto-${p.slug}`}
+                    className="flex h-full flex-col overflow-hidden rounded-card border border-border bg-background transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <div className="flex aspect-square items-center justify-center bg-muted p-2">
+                      {p.foto_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- foto del bucket
+                        <img
+                          src={p.foto_url}
+                          alt=""
+                          loading="lazy"
+                          className="size-full object-contain"
+                        />
+                      ) : null}
+                    </div>
+                    <div className="flex flex-1 flex-col gap-1 p-3">
+                      <span className="line-clamp-2 text-meta font-medium">
+                        {p.nombre}
+                      </span>
+                      <span className="mt-auto font-heading font-semibold">
+                        {pesosLabel(p.precio)}
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {totalProductos > productos.length ? (
+              <p className="text-meta text-muted-foreground">
+                Y {totalProductos - productos.length} productos más en{" "}
+                <Link
+                  href={`/tiendas/${tienda.slug}`}
+                  className="font-semibold text-primary underline underline-offset-4"
+                >
+                  {tienda.nombre}
+                </Link>
+                .
+              </p>
+            ) : null}
+          </>
+        ) : null}
+        {grupos.length === 0 &&
+        productos.length === 0 &&
+        sinGenericas(q, grupo_label) ? (
           <p className="text-meta">
             ¿No está tu {grupo_label.toLowerCase()}?{" "}
             <Link

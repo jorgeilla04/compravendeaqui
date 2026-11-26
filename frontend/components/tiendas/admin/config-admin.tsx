@@ -186,6 +186,14 @@ export function ConfigAdmin({
                 value={c.envio_demora}
                 onChange={(e) => set("envio_demora", e.target.value)}
               />
+              <TextField
+                id="stock_demora"
+                label="Demora de lo que está en stock"
+                optional
+                hint="Ej.: 24 hs. Si la cargás, marcás en cada producto si está en stock; los demás salen en la demora de arriba."
+                value={c.stock_demora ?? ""}
+                onChange={(e) => set("stock_demora", e.target.value || null)}
+              />
             </div>
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-meta font-semibold">

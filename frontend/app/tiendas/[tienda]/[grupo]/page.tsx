@@ -62,7 +62,7 @@ export default async function GrupoPage({ params }: Props) {
           <h1 className="font-heading text-h1 font-semibold">{grupo.nombre}</h1>
           <p className="text-muted-foreground">
             {grupo.subtitulo ? `${grupo.subtitulo} · ` : ""}Elegí los productos
-            {tienda.opcion_label
+            {grupo.productos.some((p) => p.opciones.length > 0)
               ? ` y ${tienda.opcion_label.toLowerCase()}`
               : ""}
             .
@@ -102,6 +102,11 @@ export default async function GrupoPage({ params }: Props) {
               producto={producto}
               opcionLabel={tienda.opcion_label}
               whatsappUrl={tienda.whatsapp_url}
+              demoras={
+                tienda.stock_demora
+                  ? { stock: tienda.stock_demora, pedido: tienda.envio_demora }
+                  : null
+              }
             />
           ))}
         </ul>

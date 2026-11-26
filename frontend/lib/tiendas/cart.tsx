@@ -14,6 +14,8 @@ export interface CartItem {
   opcion: string | null;
   cantidad: number;
   precio: number;
+  /** En stock (sale antes): define la demora del envío del pedido. */
+  enStock?: boolean;
 }
 
 interface CartContextValue {
